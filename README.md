@@ -1,4 +1,4 @@
-# MapGaps V2
+# MapGapsVersion2
 
 MapGaps is a dashboard for spotting gaps and uncertainty in heritage-collection metadata from
 [Europeana](https://www.europeana.eu). The flags follow the **uncertainty-flagging taxonomy**
