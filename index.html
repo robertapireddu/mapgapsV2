@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MapGaps</title>
+  <meta name="description" content="Spot missing, incomplete, contested and inconsistent metadata in Europeana heritage collections.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>MapGaps</h1>
+      <p>Gaps and uncertainty in Europeana collection metadata</p>
+    </div>
+
+    <details class="source" id="source">
+      <summary><span id="source-label">Sample collection</span> · <span id="record-count">0</span> records</summary>
+      <div class="source-panel">
+        <section>
+          <h2>Europeana Search API</h2>
+          <form id="europeana-form">
+            <label>API key <input name="apiKey" required autocomplete="off" placeholder="your wskey"></label>
+            <label>Query <input name="query" placeholder='e.g. roma OR DATA_PROVIDER:"…"'></label>
+            <label>Max records <input name="max" type="number" min="1" max="1000" value="200"></label>
+            <button type="submit">Fetch records</button>
+            <p class="hint">Free key at <a href="https://pro.europeana.eu/page/get-api" target="_blank" rel="noopener">pro.europeana.eu</a>.</p>
+          </form>
+        </section>
+        <section>
+          <h2>File</h2>
+          <label class="file">CSV or JSON <input type="file" id="file-input" accept=".csv,.json,text/csv,application/json"></label>
+          <p class="hint">Dublin Core headers (<code>dc:title</code>, <code>dc:date</code>, <code>dcterms:spatial</code>…) or a saved Europeana API response.</p>
+        </section>
+        <section>
+          <button type="button" id="use-sample" class="ghost">Back to sample collection</button>
+          <p class="hint">The sample records are synthetic.</p>
+        </section>
+        <p class="status" id="source-status" role="status"></p>
+      </div>
+    </details>
+  </header>
+
+  <section class="filters" aria-label="Filters">
+    <fieldset class="filter">
+      <legend>Filter 1 · Gap</legend>
+      <div class="segmented">
+        <label><input type="radio" name="mode" value="uncertain" checked><span>Uncertain</span></label>
+        <label><input type="radio" name="mode" value="missing"><span>Missing</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="filter">
+      <legend>Filter 2 · Dimension</legend>
+      <select id="dimension" aria-label="Dimension"></select>
+    </fieldset>
+
+    <fieldset class="filter" id="type-filter">
+      <legend>Filter 3 · Uncertainty</legend>
+      <div class="types" id="types"></div>
+    </fieldset>
+  </section>
+
+  <main class="layout">
+    <aside class="left">
+      <section class="card" aria-labelledby="overview-title">
+        <div class="card-head">
+          <h2 id="overview-title">Completeness overview</h2>
+          <ul class="legend">
+            <li><i class="sw sw-complete"></i>Complete</li>
+            <li><i class="sw sw-incomplete"></i>Incomplete</li>
+            <li><i class="sw sw-missing"></i>Missing</li>
+          </ul>
+        </div>
+        <div id="overview" class="overview"></div>
+      </section>
+
+      <section class="card" aria-labelledby="grid-title">
+        <div class="card-head">
+          <h2 id="grid-title">Records</h2>
+          <p class="sub" id="grid-sub"></p>
+        </div>
+        <div id="grid" class="grid" role="listbox" aria-labelledby="grid-title"></div>
+        <div class="scale" id="scale"></div>
+      </section>
+    </aside>
+
+    <section class="right" aria-live="polite">
+      <div id="record" class="record"></div>
+    </section>
+  </main>
+
+  <dialog id="similar" class="similar" aria-labelledby="similar-title">
+    <form method="dialog" class="similar-head">
+      <div>
+        <p class="eyebrow">Record list with similar terms</p>
+        <h2 id="similar-title"></h2>
+      </div>
+      <button class="close" aria-label="Close">×</button>
+    </form>
+    <p class="note" id="similar-note"></p>
+    <div class="chips" id="similar-variants" role="group" aria-label="Variants"></div>
+    <ol class="similar-list" id="similar-list"></ol>
+  </dialog>
+
+  <script src="data/vocabulary.js"></script>
+  <script src="data/sample-data.js"></script>
+  <script src="js/analysis.js"></script>
+  <script src="js/io.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
