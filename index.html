@@ -23,6 +23,7 @@
             <label>API key <input name="apiKey" required autocomplete="off" placeholder="your wskey"></label>
             <label>Query <input name="query" placeholder='e.g. roma OR DATA_PROVIDER:"…"'></label>
             <label>Max records <input name="max" type="number" min="1" max="1000" value="200"></label>
+            <label class="check"><input type="checkbox" name="full" checked> Full records (Record API): compares the provider and Europeana proxies, needed for data-conversion rules; slower</label>
             <button type="submit">Fetch records</button>
             <p class="hint">Free key at <a href="https://pro.europeana.eu/page/get-api" target="_blank" rel="noopener">pro.europeana.eu</a>.</p>
           </form>
@@ -30,7 +31,7 @@
         <section>
           <h2>File</h2>
           <label class="file">CSV or JSON <input type="file" id="file-input" accept=".csv,.json,text/csv,application/json"></label>
-          <p class="hint">Dublin Core headers (<code>dc:title</code>, <code>dc:date</code>, <code>dcterms:spatial</code>…) or a saved Europeana API response.</p>
+          <p class="hint">CSV with Europeana/Dublin Core headers (<code>dcTitle</code> or <code>dc:title</code>, <code>dcDate</code>, <code>dcCoverage</code>, <code>edmCountry</code>…; prefix a column with <code>europeana:</code> for Europeana-proxy values), or a saved Search / Record API response.</p>
         </section>
         <section>
           <button type="button" id="use-sample" class="ghost">Back to sample collection</button>
@@ -59,6 +60,11 @@
       <legend>Filter 3 · Uncertainty</legend>
       <div class="types" id="types"></div>
     </fieldset>
+
+    <fieldset class="filter">
+      <legend>Origin</legend>
+      <div class="origins" id="origins"></div>
+    </fieldset>
   </section>
 
   <main class="layout">
@@ -83,6 +89,14 @@
         <div id="grid" class="grid" role="listbox" aria-labelledby="grid-title"></div>
         <div class="scale" id="scale"></div>
       </section>
+
+      <section class="card" aria-labelledby="rules-title">
+        <div class="card-head">
+          <h2 id="rules-title">Taxonomy rules in view</h2>
+          <p class="sub" id="rules-sub"></p>
+        </div>
+        <ul class="rules" id="rules"></ul>
+      </section>
     </aside>
 
     <section class="right" aria-live="polite">
@@ -103,6 +117,7 @@
     <ol class="similar-list" id="similar-list"></ol>
   </dialog>
 
+  <script src="data/taxonomy.js"></script>
   <script src="data/vocabulary.js"></script>
   <script src="data/sample-data.js"></script>
   <script src="js/analysis.js"></script>

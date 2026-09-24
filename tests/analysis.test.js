@@ -3,104 +3,171 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const A = require('../js/analysis.js');
 const IO = require('../js/io.js');
-const VOCABULARY = require('../data/vocabulary.js');
+const taxonomy = require('../data/taxonomy.js');
+const vocabulary = require('../data/vocabulary.js');
 const SAMPLE = require('../data/sample-data.js');
 
-const flagsOf = (record, field) => record.flags.filter((f) => f.field === field).map((f) => f.type);
+const run = (rows) => A.analyse(rows, { taxonomy, vocabulary });
+const rulesOf = (record, field) => [...new Set(record.flags.filter((f) => !field || f.field === field).map((f) => f.rule))].sort();
+const has = (record, rule, field) => record.flags.some((f) => f.rule === rule && (!field || f.field === field));
 
-test('missing placeholders are detected', () => {
-  for (const v of ['', 'none', 'Unknown', '[unknown]', 'n.d.', 'Unknown photographer', 'anonymous']) {
-    assert.ok(A.isMissing(v), v);
+test('the taxonomy has every rule the engine implements', () => {
+  const ids = taxonomy.rules.map((r) => r.id);
+  for (const id of ['MISS-TEMP', 'INT-TEMP-INCOMP', 'INT-SP-CONT', 'INT-LING-INCONS', 'EXT-UI-LING-CONT', 'MISS-DATAC-ATTR', 'EXT-UI-ATTR-INC']) {
+    assert.ok(ids.includes(id), id);
   }
-  assert.ok(!A.isMissing('1952'));
 });
 
-test('temporal incompleteness and contested dates', () => {
-  const { records } = A.analyse([
-    { id: 'a', date: '20th cent.' }, { id: 'b', date: '1950s' }, { id: 'c', date: 'c. 1935' },
-    { id: 'd', date: '1931 or 1934' }, { id: 'e', date: '1920?' }, { id: 'f', date: '1952-06-12' },
-  ]);
-  assert.deepEqual(records.map((r) => flagsOf(r, 'date')), [
-    ['incomplete'], ['incomplete'], ['incomplete'], ['contested'], ['contested'], [],
-  ]);
+test('MISS-*: empty fields are flagged per dimension listed in the taxonomy', () => {
+  const [r] = run([{ dcTitle: 'A title', dcDate: 'none' }]).records;
+  assert.ok(has(r, 'MISS-TEMP', 'dcDate'));
+  assert.ok(has(r, 'MISS-TEMP', 'dcDescription'));
+  assert.ok(has(r, 'MISS-SP', 'dcDescription'));
+  assert.ok(has(r, 'MISS-LING', 'dcDescription'));
+  assert.ok(has(r, 'MISS-ATTR', 'dcCreator'));
+  assert.ok(!has(r, 'MISS-LING', 'dcTitle'), 'dcTitle is not listed under MISS-LING');
 });
 
-test('vocabulary variants flag non-preferred terms (Gypsy / Roma / Romani)', () => {
-  const { records, groups } = A.analyse([
-    { id: '1', title: 'Roma family' },
-    { id: '2', title: 'Gipsy encampment' },
-    { id: '3', subject: 'Romani; Gypsies' },
-  ], VOCABULARY);
+test('INT-TEMP-INCOMP: every keyword of the Temporal Keywords sheet', () => {
+  const values = ['ca. 1950', 'c.1935', '~1880', 'approximately 1900', 'possibly 1931', 'undated', 'no date',
+    'between 1920 and 1930', '20th century', 'twentieth century', 'early 20th century', 'mid-19th century',
+    '1930s', "1930's", "30's", 'thirties', 'pre-war', 'interwar', 'between the wars', 'Victorian',
+    'Belle Epoque', 'fin de siècle', 'medieval', 'early modern'];
+  const { records } = run(values.map((d) => ({ dcDate: d })));
+  records.forEach((r, i) => assert.ok(has(r, 'INT-TEMP-INCOMP', 'dcDate'), values[i]));
+  const [precise] = run([{ dcDate: '1952-06-12' }]).records;
+  assert.ok(!has(precise, 'INT-TEMP-INCOMP'));
+});
+
+test('false positives from the Contested words sheet are ignored', () => {
+  assert.ok(taxonomy.falsePositives.includes('stone-age'));
+});
+
+test('EXT-UI-TEMP-INCOM: guessed, abbreviated and mistyped dates', () => {
+  const values = ['193-', '19??', '1920?', '[1934]', "'52", '19522', '2099'];
+  const { records } = run(values.map((d) => ({ dcDate: d })));
+  records.forEach((r, i) => assert.ok(has(r, 'EXT-UI-TEMP-INCOM', 'dcDate'), values[i]));
+});
+
+test('INT-SP-INCOMP: a country is the only place information', () => {
+  const [countryOnly, withPlace] = run([
+    { dcCoverage: 'UK', edmCountry: 'United Kingdom' },
+    { dcCoverage: 'Epsom Downs, Surrey, England', edmCountry: 'United Kingdom' },
+  ]).records;
+  assert.ok(has(countryOnly, 'INT-SP-INCOMP', 'dcCoverage'));
+  assert.ok(!has(withPlace, 'INT-SP-INCOMP'));
+});
+
+test('INT-SP-INCONS and EXT-UI-SPA-INCONS: conflicting countries, variant forms of one place', () => {
+  const [r] = run([{ dcCoverage: ['Cluj-Napoca, Cluj, Romania', 'UK', 'United Kingdom'], edmCountry: 'United Kingdom' }]).records;
+  assert.ok(has(r, 'INT-SP-INCONS'));
+  assert.ok(has(r, 'EXT-UI-SPA-INCONS', 'dcCoverage'));
+});
+
+test('INT-SP-CONT and INT-TEMP-INCONS: records of the same object disagree', () => {
+  const { records, groups } = run([
+    { id: 'a', dcIdentifier: 'OBJ-1', dcTitle: 'Wagon', dcCoverage: 'Appleby-in-Westmorland, Cumbria, England', dcDate: '1952' },
+    { id: 'b', dcIdentifier: 'OBJ-1', dcTitle: 'Wagon', dcCoverage: 'Cluj-Napoca, Cluj, Romania', dcDate: '1912' },
+  ]);
+  for (const r of records) {
+    assert.ok(has(r, 'INT-SP-CONT'), r.id);
+    assert.ok(has(r, 'INT-TEMP-INCONS', 'dcDate'), r.id);
+  }
+  assert.ok(Object.keys(groups).some((k) => k.startsWith('object:')));
+});
+
+test('INT-LING-INCONS: Gypsy / Gipsy / Romani / Roma across the collection', () => {
+  const { records, groups } = run([
+    { id: '1', dcTitle: 'Roma family' },
+    { id: '2', dcTitle: 'Gipsy encampment' },
+    { id: '3', dcSubject: 'Romani; Horse fairs' },
+  ]);
   const group = groups['vocab:roma'];
-  assert.ok(group);
-  assert.deepEqual(group.variants.map((v) => v.label).sort(), ['Gipsy', 'Gypsies', 'Roma', 'Romani']);
+  assert.deepEqual(group.variants.map((v) => v.label).sort(), ['Gipsy', 'Roma', 'Romani']);
   assert.equal(group.variants.find((v) => v.preferred).label, 'Roma');
-  assert.deepEqual(flagsOf(records[0], 'title'), []);
-  assert.deepEqual(flagsOf(records[1], 'title'), ['inconsistent']);
-  assert.equal(records[1].flags.find((f) => f.field === 'title').term, 'Gipsy');
-  assert.deepEqual(flagsOf(records[2], 'subject'), ['inconsistent', 'inconsistent']);
-  // the reference term is still linked to the group so it can open the pop-up
-  assert.equal(records[0].terms[0].groupId, 'vocab:roma');
+  assert.ok(!has(records[0], 'INT-LING-INCONS'));
+  assert.ok(has(records[1], 'INT-LING-INCONS', 'dcTitle'));
+  assert.ok(has(records[1], 'EXT-UI-LING-CONT', 'dcTitle'), '"Gipsy" is also a contested term');
+  assert.equal(records[0].terms[0].groupId, 'vocab:roma', 'the reference term still opens the pop-up');
 });
 
-test('a single consistent term is not flagged', () => {
-  const { records, groups } = A.analyse([{ id: '1', title: 'Gypsy wagon' }, { id: '2', title: 'Gypsy fair' }], VOCABULARY);
-  assert.equal(groups['vocab:roma'], undefined);
-  assert.deepEqual(flagsOf(records[0], 'title'), []);
+test('EXT-UI-LING-INCONS: several names for the same community inside one record', () => {
+  const [r] = run([{ dcSubject: ['Roma', 'Gypsy', 'Romani'] }]).records;
+  assert.equal(r.flags.filter((f) => f.rule === 'EXT-UI-LING-INCONS').length, 3);
 });
 
-test('longer vocabulary matches win over overlapping shorter ones', () => {
-  const hits = A.findVocabularyMatches('Irish Travellers camp', VOCABULARY);
-  assert.deepEqual(hits.map((h) => h.text), ['Irish Travellers']);
-  assert.equal(A.findVocabularyMatches('Romania', VOCABULARY.filter((g) => g.id === 'roma')).length, 0);
+test('INT-LING-INCOMP: generic labels; Contested when self-designations are known', () => {
+  const [generic, aggregated, specific] = run([
+    { dcSubject: 'folk music' },
+    { dcSubject: 'Travellers' },
+    { dcSubject: ['Travellers', 'Irish Travellers'] },
+  ]).records;
+  assert.equal(generic.flags.find((f) => f.rule === 'INT-LING-INCOMP').type, 'incomplete');
+  assert.equal(aggregated.flags.find((f) => f.rule === 'INT-LING-INCOMP').type, 'contested');
+  assert.ok(!specific.flags.some((f) => f.rule === 'INT-LING-INCOMP' && f.term === 'Travellers'));
 });
 
-test('name forms of the same creator are grouped', () => {
-  const { groups } = A.analyse([
-    { id: '1', creator: 'Hartley, Edith' }, { id: '2', creator: 'Hartley, Edith' },
-    { id: '3', creator: 'Edith Hartley' }, { id: '4', creator: 'E. Hartley' }, { id: '5', creator: 'Hartley' },
+test('EXT-DATAC-LING-INCONS: diacritics kept in some records, stripped in others', () => {
+  const { records } = run([{ dcSubject: 'Sfântul Ilie' }, { dcSubject: 'Sfântul Ilie' }, { dcSubject: 'Sfantul Ilie' }]);
+  assert.ok(has(records[2], 'EXT-DATAC-LING-INCONS', 'dcSubject'));
+});
+
+test('EXT-DATAC-TEMP-INCONS: approximation notation varies across records', () => {
+  const { records } = run([{ dcDate: 'ca. 1880' }, { dcDate: 'ca. 1890' }, { dcDate: 'circa 1880' }]);
+  assert.ok(has(records[2], 'EXT-DATAC-TEMP-INCONS', 'dcDate'));
+});
+
+test('attributional rules: bare Wikidata address, URL instead of a name', () => {
+  const [wikidata, url] = run([{ dcCreator: 'https://www.wikidata.org' }, { dcCreator: 'http://viaf.org/viaf/123' }]).records;
+  assert.ok(has(wikidata, 'EXT-UI-ATTR-INC', 'dcCreator'));
+  assert.ok(has(url, 'EXT-DATAC-LINK-INCOMP', 'dcCreator'));
+});
+
+test('data-conversion rules compare the provider and Europeana proxies', () => {
+  const recordApi = (n, provider, europeana) => ({
+    about: `/1/${n}`,
+    proxies: [{ europeanaProxy: false, ...provider }, { europeanaProxy: true, ...europeana }],
+    timespans: [{ about: 'http://data.europeana.eu/timespan/1880', prefLabel: { en: ['1880'] } }],
+    places: [{ about: 'http://data.europeana.eu/place/ro', prefLabel: { en: ['Romania'] } }],
+  });
+  const { records } = run([
+    recordApi(1, { dcDate: { def: ['circa 1880'] }, dcCoverage: { def: ['Cluj-Napoca, Cluj, Romania'] }, dcTitle: { en: ['A'] }, dcContributor: { def: ['X'] }, dcSubject: { en: ['a', 'b', 'c'] } },
+      { dcDate: { def: ['http://data.europeana.eu/timespan/1880'] }, dcCoverage: { def: ['http://data.europeana.eu/place/ro'] }, dcSubject: { def: ['a'] } }),
+    recordApi(2, { dcTitle: { en: ['B'] }, dcContributor: { def: ['Y'] } }, {}),
   ]);
-  const group = Object.values(groups).find((g) => g.id.startsWith('auto:creator:'));
-  assert.deepEqual(group.variants.map((v) => v.label), ['Hartley, Edith', 'Edith Hartley', 'E. Hartley', 'Hartley']);
-});
-
-test('mixed date formats are inconsistent', () => {
-  const { records, groups } = A.analyse([
-    { id: '1', date: '1952-06-12' }, { id: '2', date: '1961' }, { id: '3', date: '12/06/1952' },
-  ]);
-  assert.ok(groups['format:date']);
-  assert.deepEqual(flagsOf(records[2], 'date'), ['inconsistent']);
+  const [r] = records;
+  assert.equal(r.target.dcDate[0], '1880', 'Europeana-proxy entity is resolved to its label');
+  assert.ok(has(r, 'EXT-DATAC-TEMP-INCOM', 'dcDate'));
+  assert.ok(has(r, 'EXT-DATAC-SPA-INCOM', 'dcCoverage'));
+  assert.ok(has(r, 'EXT-DATAC-LING-INCOM', 'dcSubject'));
+  assert.ok(has(r, 'MISS-DATAC-ATTR', 'dcContributor'));
+  assert.ok(has(r, 'MISS-DATAC-LING', 'dcTitle'));
 });
 
 test('completeness distinguishes missing, incomplete and complete', () => {
-  const { fieldStats } = A.analyse([{ id: '1', date: '' }, { id: '2', date: '1950s' }, { id: '3', date: '1952' }]);
-  assert.deepEqual(fieldStats.find((s) => s.key === 'date').completeness, { missing: 1, incomplete: 1, complete: 1 });
+  const { fieldStats } = run([{ dcDate: '' }, { dcDate: '1950s' }, { dcDate: '1952' }]);
+  const date = fieldStats.find((s) => s.key === 'dcDate');
+  assert.deepEqual([date.missing, date.incomplete, date.complete], [1, 1, 1]);
 });
 
-test('Europeana Search API items are mapped', () => {
-  const [r] = A.normaliseRecords([{
-    id: '/123/abc', guid: 'https://www.europeana.eu/item/123/abc', dataProvider: ['Museum'],
-    title: ['A title'], dcCreatorLangAware: { def: ['Hartley, Edith'] }, year: ['1952'],
-    edmPlaceLabel: ['Bucharest'], dcSubjectLangAware: { en: ['Roma', 'Music'] }, dcLanguage: ['en'],
+test('Europeana Search API items and CSV rows are mapped onto Europeana fields', () => {
+  const [item] = A.normaliseRecords([{
+    id: '/123/abc', dataProvider: ['Museum'], title: ['A title'], dcCreatorLangAware: { def: ['Hartley, Edith'] },
+    year: ['1952'], edmPlaceLabel: ['Bucharest'], country: ['romania'], dcSubjectLangAware: { en: ['Roma', 'Music'] },
   }]);
-  assert.equal(r.id, '/123/abc');
-  assert.equal(r.creator, 'Hartley, Edith');
-  assert.equal(r.date, '1952');
-  assert.equal(r.spatial, 'Bucharest');
-  assert.deepEqual(r.subject, ['Roma', 'Music']);
-  assert.equal(r.provider, 'Museum');
+  assert.deepEqual([item.values.dcCreator[0], item.values.dcDate[0], item.values.dcCoverage[0], item.values.edmCountry[0]], ['Hartley, Edith', '1952', 'Bucharest', 'romania']);
+  assert.deepEqual(item.values.dcSubject, ['Roma', 'Music']);
+
+  const [row] = A.normaliseRecords(IO.parseCSV('dc:identifier,dc:title,dc:subject,dcterms:spatial,europeana:dcDate\n1,"Title, with comma",Roma; Gypsy,UK,1880\n'));
+  assert.deepEqual(row.values.dcTitle, ['Title, with comma']);
+  assert.deepEqual(row.values.dcSubject, ['Roma', 'Gypsy']);
+  assert.deepEqual(row.values.dcCoverage, ['UK']);
+  assert.deepEqual(row.target.dcDate, ['1880']);
 });
 
-test('CSV with Dublin Core headers is parsed', () => {
-  const rows = IO.parseCSV('dc:identifier,dc:title,dc:subject,dcterms:spatial\n1,"Title, with comma",Roma; Gypsy,UK\n');
-  const [r] = A.normaliseRecords(rows);
-  assert.equal(r.title, 'Title, with comma');
-  assert.deepEqual(r.subject, ['Roma', 'Gypsy']);
-  assert.equal(r.spatial, 'UK');
-});
-
-test('the sample collection exercises every flag type', () => {
-  const { records } = A.analyse(SAMPLE, VOCABULARY);
-  const types = new Set(records.flatMap((r) => r.flags.map((f) => f.type)));
-  assert.deepEqual([...types].sort(), ['contested', 'incomplete', 'inconsistent', 'missing']);
+test('the sample collection exercises the taxonomy', () => {
+  const { records } = run(SAMPLE);
+  const fired = new Set(records.flatMap((r) => r.flags.map((f) => f.rule)));
+  const silent = taxonomy.rules.map((r) => r.id).filter((id) => !fired.has(id));
+  assert.deepEqual(silent, ['MISS-DATAC-LING'], 'titles do reach the Europeana proxy in the sample');
 });

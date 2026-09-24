@@ -4,18 +4,25 @@
 
   const A = window.MapGapsAnalysis;
   const IO = window.MapGapsIO;
-  const VOCABULARY = window.MAPGAPS_VOCABULARY || [];
+  const TAXONOMY = window.MAPGAPS_TAXONOMY;
+  const VOCABULARY = window.MAPGAPS_VOCABULARY || {};
 
-  const TYPE_LABEL = Object.fromEntries(A.FLAG_TYPES.map((t) => [t.id, t.label]));
+  const TYPE_LABEL = Object.fromEntries(A.TYPES.map((t) => [t.id, t.label]));
+  const ORIGIN_LABEL = Object.fromEntries(A.ORIGINS.map((o) => [o.id, o.label]));
+  const RULES = Object.fromEntries(TAXONOMY.rules.map((r) => [r.id, r]));
   const UNCERTAIN_TYPES = ['inconsistent', 'incomplete', 'contested'];
   const TYPE_COLOUR = {
     inconsistent: 'var(--inconsistent)', incomplete: 'var(--incomplete)',
     contested: 'var(--contested)', missing: 'var(--missing)',
   };
+  const TYPE_PRIORITY = ['inconsistent', 'contested', 'incomplete', 'missing'];
 
   const state = {
     analysis: null,
-    filter: { mode: 'uncertain', dimension: 'temporal', type: 'incomplete' },
+    filter: {
+      mode: 'uncertain', dimension: 'temporal', type: 'incomplete',
+      origins: new Set(A.ORIGINS.map((o) => o.id)),
+    },
     selectedId: null,
     popup: { groupId: null, variant: null },
   };
@@ -37,7 +44,7 @@
   // ---------------------------------------------------------------- data
 
   function load(rows, label) {
-    state.analysis = A.analyse(rows, VOCABULARY);
+    state.analysis = A.analyse(rows, { taxonomy: TAXONOMY, vocabulary: VOCABULARY });
     state.selectedId = null;
     $('#source-label').textContent = label;
     $('#record-count').textContent = state.analysis.records.length;
@@ -76,7 +83,8 @@
         apiKey: form.get('apiKey').trim(),
         query: form.get('query').trim(),
         max: Number(form.get('max')) || 200,
-        onProgress: (n, total) => setStatus(`Fetched ${n} of ${total ?? '?'} results…`),
+        full: form.get('full') === 'on',
+        onProgress: (n, total, what = 'results') => setStatus(`Fetched ${n} of ${total ?? '?'} ${what}…`),
       });
       if (!items.length) throw new Error('The query returned no records.');
       load(items, `Europeana: ${form.get('query').trim() || 'all'}`);
@@ -97,6 +105,10 @@
 
   // ------------------------------------------------------------- filters
 
+  const originsForMode = () => (state.filter.mode === 'missing'
+    ? ['Empty field', 'Data conversion']
+    : ['Epistemic', 'User input', 'Data conversion']);
+
   function buildFilters() {
     const dimension = $('#dimension');
     dimension.append(...A.DIMENSIONS.map((d) => el('option', { value: d.id }, d.label)), el('option', { value: 'all' }, 'All dimensions'));
@@ -111,55 +123,64 @@
       if (e.target === dimension) state.filter.dimension = dimension.value;
       else if (e.target.name === 'mode') state.filter.mode = e.target.value;
       else if (e.target.name === 'type') state.filter.type = e.target.value;
+      else if (e.target.name === 'origin') state.filter.origins[e.target.checked ? 'add' : 'delete'](e.target.value);
       else return;
       keepRelevantSelection();
       render();
     });
   }
 
+  function renderOrigins() {
+    $('#origins').replaceChildren(...originsForMode().map((o) =>
+      el('label', { class: 'toggle' },
+        el('input', { type: 'checkbox', name: 'origin', value: o, checked: state.filter.origins.has(o) }),
+        el('span', {}, ORIGIN_LABEL[o]))));
+  }
+
   /** After a filter change, jump to the top record if the selected one has nothing to show. */
   function keepRelevantSelection() {
     const current = state.analysis.records.find((r) => r.id === state.selectedId);
-    if (current && A.matchingFlags(current, state.filter).length) return;
+    if (current && A.flaggedFieldCount(current, state.filter)) return;
     const top = sortedRecords()[0];
     if (top && top.n) state.selectedId = top.record.id;
   }
 
   const activeType = () => (state.filter.mode === 'missing' ? 'missing' : state.filter.type);
-  const inDimension = (fieldKey) =>
-    state.filter.dimension === 'all' || A.FIELD_BY_KEY[fieldKey].dimension === state.filter.dimension;
+  const fieldInDimension = (key) => state.filter.dimension === 'all' ||
+    A.dimensionsOf(TAXONOMY, key).includes(state.filter.dimension);
 
   // ------------------------------------------------------------- render
 
   function render() {
     $('#type-filter').disabled = state.filter.mode === 'missing';
+    renderOrigins();
     renderOverview();
     renderGrid();
+    renderRules();
     renderRecord();
   }
 
   function renderOverview() {
+    const head = el('div', { class: 'ov-row ov-head' }, el('span', {}, 'Field'), el('span', {}, 'Share of records'), el('span', {}, 'Complete'));
     const rows = state.analysis.fieldStats.map((s) => {
       const pct = (n) => (s.total ? (100 * n) / s.total : 0);
-      const { missing, incomplete } = s.completeness;
       return el('div', {
-        class: `ov-row${inDimension(s.key) ? '' : ' dim'}`,
-        title: `${s.label}: ${missing} missing, ${incomplete} incomplete, ${s.completeness.complete} complete`,
+        class: `ov-row${fieldInDimension(s.key) ? '' : ' dim'}`,
+        title: `${s.label} (${s.dimensions.join(', ')}): ${s.missing} missing, ${s.incomplete} incomplete, ${s.complete} complete`,
       },
       el('span', { class: 'ov-label' }, s.label),
-      el('span', { class: 'ov-bar', role: 'img', 'aria-label': `${s.label}: ${Math.round(pct(missing))}% missing, ${Math.round(pct(incomplete))}% incomplete` },
-        el('i', { class: 'missing', style: `width:${pct(missing)}%` }),
-        el('i', { class: 'incomplete', style: `width:${pct(incomplete)}%` })),
-      el('span', { class: 'ov-pct' }, `${Math.round(pct(s.completeness.complete))}%`));
+      el('span', { class: 'ov-bar', role: 'img', 'aria-label': `${s.label}: ${Math.round(pct(s.missing))}% missing, ${Math.round(pct(s.incomplete))}% incomplete` },
+        el('i', { class: 'missing', style: `width:${pct(s.missing)}%` }),
+        el('i', { class: 'incomplete', style: `width:${pct(s.incomplete)}%` })),
+      el('span', { class: 'ov-pct' }, `${Math.round(pct(s.complete))}%`));
     });
-    const head = el('div', { class: 'ov-row ov-head' }, el('span', {}, 'Field'), el('span', {}, 'Share of records'), el('span', {}, 'Complete'));
     $('#overview').replaceChildren(head, ...rows);
   }
 
   function sortedRecords() {
     return state.analysis.records
-      .map((r) => ({ record: r, n: A.matchingFlags(r, state.filter).length }))
-      .sort((a, b) => b.n - a.n || b.record.flags.length - a.record.flags.length);
+      .map((r) => ({ record: r, n: A.flaggedFieldCount(r, state.filter), flags: A.matchingFlags(r, state.filter).length }))
+      .sort((a, b) => b.n - a.n || b.flags - a.flags || b.record.flags.length - a.record.flags.length);
   }
 
   function intensity(n, max) {
@@ -168,15 +189,17 @@
     return `${steps[Math.min(steps.length - 1, Math.ceil((n / max) * steps.length) - 1)]}%`;
   }
 
+  const recordTitle = (r) => r.values.dcTitle[0] || r.id;
+
   function renderGrid() {
     const list = sortedRecords();
     const max = Math.max(1, ...list.map((x) => x.n));
     const type = activeType();
     const flagged = list.filter((x) => x.n > 0).length;
-    const dim = state.filter.dimension === 'all' ? 'all dimensions' : `${state.filter.dimension}`;
+    const dim = state.filter.dimension === 'all' ? 'all dimensions' : state.filter.dimension;
 
     $('#grid-title').textContent = `Records · ${TYPE_LABEL[type].toLowerCase()} (${dim})`;
-    $('#grid-sub').textContent = `${flagged} of ${list.length} flagged · sorted from most to least`;
+    $('#grid-sub').textContent = `${flagged} of ${list.length} flagged · most to least flagged fields`;
 
     if (!state.selectedId || !state.analysis.records.some((r) => r.id === state.selectedId)) {
       state.selectedId = list[0] && list[0].record.id;
@@ -186,15 +209,41 @@
       el('button', {
         class: 'tile', role: 'option', 'data-n': n, 'aria-selected': String(record.id === state.selectedId),
         style: `--c:${TYPE_COLOUR[type]};--k:${intensity(n, max)}`,
-        title: `${record.title || record.id}\n${n} ${TYPE_LABEL[type].toLowerCase()} field value${n === 1 ? '' : 's'}`,
-        'aria-label': `${record.title || record.id}: ${n} flagged`,
+        title: `${recordTitle(record)}\n${n} ${TYPE_LABEL[type].toLowerCase()} field${n === 1 ? '' : 's'}`,
+        'aria-label': `${recordTitle(record)}: ${n} flagged fields`,
         onclick: () => select(record.id),
       }, n || '')));
 
     const scaleSteps = ['0%', '35%', '55%', '75%', '100%'];
     $('#scale').replaceChildren('fewer',
       ...scaleSteps.map((k) => el('i', { style: k === '0%' ? '' : `background:color-mix(in srgb, ${TYPE_COLOUR[type]} ${k}, var(--surface));border-color:transparent` })),
-      `more flags (max ${max})`);
+      `more flagged fields (max ${max})`);
+  }
+
+  function renderRules() {
+    const counts = new Map();
+    for (const r of state.analysis.records) {
+      for (const f of A.matchingFlags(r, state.filter)) {
+        if (!counts.has(f.rule)) counts.set(f.rule, new Set());
+        counts.get(f.rule).add(r.id);
+      }
+    }
+    const type = activeType();
+    const relevant = TAXONOMY.rules.filter((rule) =>
+      (state.filter.dimension === 'all' || rule.dimension === state.filter.dimension) &&
+      state.filter.origins.has(rule.subCategory || 'Empty field') &&
+      (rule.type === type || counts.has(rule.id)));
+    $('#rules-sub').textContent = `from ${TAXONOMY.source}`;
+    $('#rules').replaceChildren(...relevant.map((rule) => {
+      const n = counts.has(rule.id) ? counts.get(rule.id).size : 0;
+      const needsProxies = /DATAC/.test(rule.id) && !state.analysis.hasProxies && !['EXT-DATAC-TEMP-INCOM', 'EXT-DATAC-TEMP-INCONS', 'EXT-DATAC-SPA-INCONS', 'EXT-DATAC-LING-INCONS', 'EXT-DATAC-LINK-INCOMP'].includes(rule.id);
+      return el('li', { class: n ? '' : 'none', title: rule.issue },
+        el('code', {}, rule.code),
+        el('span', { class: 'rule-issue' }, rule.issue),
+        el('span', { class: 'rule-meta' }, `${rule.scope} · ${rule.fields.join(', ')}`,
+          needsProxies ? el('em', {}, ' · needs full records (both proxies)') : null),
+        el('span', { class: 'rule-n' }, n));
+    }));
   }
 
   function select(id) {
@@ -205,32 +254,66 @@
 
   // ------------------------------------------------------ record detail
 
+  const strongest = (flags) => TYPE_PRIORITY.find((t) => flags.some((f) => f.type === t));
+
   function renderValue(record, field, value, valueIndex) {
-    const flags = record.flags.filter((fl) => fl.field === field && fl.valueIndex === valueIndex);
-    if (flags.some((fl) => fl.type === 'missing')) {
-      return el('span', { class: 'value hl-missing' }, value || 'none');
+    const flags = record.flags.filter((f) => f.field === field && f.valueIndex === valueIndex);
+    const spanned = flags.filter((f) => f.start != null);
+    const whole = flags.filter((f) => f.start == null);
+
+    // spans: flagged terms plus terms that belong to a variant group (clickable)
+    const spans = [];
+    for (const f of spanned) spans.push({ start: f.start, end: f.end, flags: [f], groupId: f.groupId, variant: f.variant });
+    for (const t of record.terms.filter((x) => x.field === field && x.valueIndex === valueIndex)) {
+      const same = spans.find((s) => s.start === t.start && s.end === t.end);
+      if (same) { same.groupId = same.groupId || t.groupId; same.variant = same.variant || t.variant; } else spans.push({ start: t.start, end: t.end, flags: [], groupId: t.groupId, variant: t.variant });
     }
-    const whole = flags.find((fl) => fl.type === 'contested') || flags.find((fl) => fl.type === 'incomplete');
-    const terms = record.terms
-      .filter((t) => t.field === field && t.valueIndex === valueIndex)
-      .sort((a, b) => a.start - b.start);
+    // merge flags that share a span, drop overlaps (longest first)
+    const merged = [];
+    for (const s of spans.sort((a, b) => b.end - b.start - (a.end - a.start))) {
+      const same = merged.find((m) => m.start === s.start && m.end === s.end);
+      if (same) { same.flags.push(...s.flags); same.groupId = same.groupId || s.groupId; same.variant = same.variant || s.variant; continue; }
+      if (!merged.some((m) => s.start < m.end && m.start < s.end)) merged.push({ ...s, flags: [...s.flags] });
+    }
+    merged.sort((a, b) => a.start - b.start);
+
     const parts = [];
     let cursor = 0;
-    for (const t of terms) {
-      if (t.start < cursor) continue;
-      const flag = flags.find((fl) => fl.type === 'inconsistent' && fl.groupId === t.groupId && fl.start === t.start);
-      const open = () => openSimilar(t.groupId, t.variant);
-      parts.push(value.slice(cursor, t.start));
+    for (const s of merged) {
+      parts.push(value.slice(cursor, s.start));
+      const type = strongest(s.flags);
+      const clickable = Boolean(s.groupId && state.analysis.groups[s.groupId]);
+      const open = () => openSimilar(s.groupId, s.variant);
       parts.push(el('mark', {
-        class: flag ? 'term' : 'term ref', tabindex: '0', role: 'button',
-        title: `${flag ? flag.reason : 'Reference term; other forms are used elsewhere in the collection'}\nClick to see records with similar terms`,
-        onclick: open,
-        onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } },
-      }, value.slice(t.start, t.end)));
-      cursor = t.end;
+        class: `term${type ? ` t-${type}` : ' ref'}${clickable ? ' linked' : ''}`,
+        tabindex: clickable ? '0' : null, role: clickable ? 'button' : null,
+        title: [...s.flags.map((f) => `${f.code}: ${f.reason}`), clickable ? 'Click to see records with similar terms' : null].filter(Boolean).join('\n'),
+        onclick: clickable ? open : null,
+        onkeydown: clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } : null,
+      }, value.slice(s.start, s.end)));
+      cursor = s.end;
     }
     parts.push(value.slice(cursor));
-    return el('span', { class: `value${whole ? ` hl-${whole.type}` : ''}` }, ...parts);
+    const wholeType = strongest(whole);
+    const groupId = (whole.find((f) => f.groupId) || {}).groupId;
+    const node = el('span', { class: `value${wholeType ? ` hl-${wholeType}` : ''}${A.isPlaceholder(value) ? ' hl-missing' : ''}` }, ...parts);
+    if (groupId && state.analysis.groups[groupId] && !merged.length) {
+      node.classList.add('linked');
+      node.tabIndex = 0;
+      node.title = 'Click to see the related records';
+      node.addEventListener('click', () => openSimilar(groupId, (whole.find((f) => f.groupId) || {}).variant));
+    }
+    return node;
+  }
+
+  function reasonItem(f) {
+    return el('li', {},
+      dot(f.type),
+      el('span', {},
+        el('code', { title: (RULES[f.rule] || {}).issue || '' }, f.code), ' ',
+        el('b', {}, TYPE_LABEL[f.type].toLowerCase()), ' ',
+        f.reason,
+        el('span', { class: 'scope' }, ` · ${f.scope} · ${ORIGIN_LABEL[f.origin]}`)));
   }
 
   function renderRecord() {
@@ -240,31 +323,37 @@
       return;
     }
     const counts = {};
-    for (const fl of record.flags) counts[fl.type] = (counts[fl.type] || 0) + 1;
+    for (const f of record.flags) counts[f.type] = (counts[f.type] || 0) + 1;
 
     const head = el('div', { class: 'record-head' },
       el('p', { class: 'eyebrow' }, 'Selected record'),
-      el('h2', {}, record.title || 'Untitled record'),
+      el('h2', {}, recordTitle(record)),
       el('div', { class: 'record-meta' },
         el('span', {}, record.id),
         record.provider && el('span', {}, record.provider),
+        record.target && el('span', {}, 'provider + Europeana proxies'),
         record.link && el('a', { href: record.link, target: '_blank', rel: 'noopener' }, 'View on Europeana ↗')),
-      el('div', { class: 'counts' }, ...A.FLAG_TYPES.map((t) =>
-        el('span', { class: 'count' }, dot(t.id), `${counts[t.id] || 0} ${t.label.toLowerCase()}`))));
+      el('div', { class: 'counts' }, ...A.TYPES.map((t) =>
+        el('span', { class: 'count' }, dot(t.id), `${counts[t.id] || 0} ${t.label.toLowerCase()}`))),
+      record.sameObject && record.sameObject.length ? el('p', { class: 'same-object' },
+        'Same object also described in: ',
+        ...record.sameObject.map((id, i) => [i ? ', ' : '', el('button', { type: 'button', class: 'linkish', onclick: () => select(id) }, id)])) : null);
 
     const cards = A.FIELDS.map((f) => {
-      const values = f.multi ? record[f.key] : [record[f.key]];
-      const flags = record.flags.filter((fl) => fl.field === f.key);
-      const active = inDimension(f.key);
+      const values = record.values[f.key];
+      const flags = record.flags.filter((x) => x.field === f.key);
+      const active = fieldInDimension(f.key);
+      const shown = flags.filter((x) => state.filter.dimension === 'all' || x.dimension === state.filter.dimension || !active);
+      const target = record.target && record.target[f.key];
       return el('article', { class: `field ${active ? 'active' : 'inactive'}` },
-        el('div', { class: 'field-label' }, f.label),
-        el('div', { class: `values${f.key === 'description' ? ' long' : ''}` },
+        el('div', { class: 'field-label' }, f.label, el('span', { class: 'dims' }, A.dimensionsOf(TAXONOMY, f.key).join(' · '))),
+        el('div', { class: `values${f.key === 'dcDescription' ? ' long' : ''}` },
           values.length ? values.map((v, i) => renderValue(record, f.key, v, i)) : el('span', { class: 'value hl-missing' }, 'none')),
-        flags.length ? el('ul', { class: 'reasons' }, ...flags.map((fl) =>
-          el('li', {}, dot(fl.type), el('span', {}, el('b', {}, `(${TYPE_LABEL[fl.type].toLowerCase()})`), ' ', fl.reason)))) : null);
+        target && (target.length || values.length) ? el('p', { class: 'target' },
+          el('span', {}, 'Europeana proxy: '), target.length ? target.join(' · ') : el('em', {}, 'nothing')) : null,
+        shown.length ? el('ul', { class: 'reasons' }, ...shown.map(reasonItem)) : null);
     });
 
-    // cards of the selected dimension come first
     cards.sort((a, b) => b.classList.contains('active') - a.classList.contains('active'));
     $('#record').replaceChildren(head, el('div', { class: 'fields' }, ...cards));
   }
@@ -281,9 +370,12 @@
   function renderSimilar() {
     const group = state.analysis.groups[state.popup.groupId];
     if (!group) return;
+    if (state.popup.variant && !group.variants.some((v) => v.key === state.popup.variant)) state.popup.variant = null;
+    const rule = RULES[group.rule || (group.kind === 'vocabulary' && !group.spatial ? 'INT-LING-INCONS' : '')];
     $('#similar-title').textContent = group.label;
-    $('#similar-note').textContent = group.note || (group.kind === 'variant'
-      ? 'Values that look like the same term written in different ways.' : '');
+    $('#similar-note').replaceChildren(
+      rule ? el('code', {}, rule.code) : '', rule ? ' ' : '',
+      group.note || '');
 
     const chip = (key, label, count, preferred) => el('button', {
       class: 'chip', type: 'button', 'aria-pressed': String(state.popup.variant === key),
@@ -301,7 +393,7 @@
 
     $('#similar-list').replaceChildren(...occurrences.map((o) => {
       const record = recordById.get(o.recordId);
-      const value = A.FIELD_BY_KEY[o.field].multi ? record[o.field][o.valueIndex] : record[o.field];
+      const value = record.values[o.field][o.valueIndex];
       const snippet = el('span', { class: 'snippet' },
         clip(value.slice(0, o.start), 'start'),
         el('mark', { class: o.preferred ? 'pref' : '' }, value.slice(o.start, o.end)),
@@ -310,7 +402,7 @@
       return el('li', {}, el('button', {
         type: 'button',
         onclick: () => { $('#similar').close(); select(o.recordId); },
-      }, el('span', { class: 'item' }, el('b', {}, record.title || 'Untitled'), record.id), snippet));
+      }, el('span', { class: 'item' }, el('b', {}, recordTitle(record)), record.id), snippet));
     }));
   }
 

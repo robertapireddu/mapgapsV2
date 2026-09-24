@@ -34,14 +34,16 @@
     return body.map((r) => Object.fromEntries(header.map((h, i) => [h.trim(), r[i] ?? ''])));
   }
 
-  /** Parse the text of a .csv or .json file. JSON may be an array, or a Europeana response with "items". */
+  /** Parse the text of a .csv or .json file: an array, a Europeana search response or a Record API response. */
   function parseFile(name, content) {
     if (/\.json$/i.test(name) || /^\s*[[{]/.test(content)) {
       const data = JSON.parse(content);
       if (Array.isArray(data)) return data;
       if (Array.isArray(data.items)) return data.items;
       if (Array.isArray(data.records)) return data.records;
-      throw new Error('JSON must be an array of records or an object with an "items" array.');
+      if (data.object && data.object.proxies) return [data.object];
+      if (data.proxies) return [data];
+      throw new Error('JSON must be an array of records, a Europeana search response ("items") or a Record API response ("object").');
     }
     return parseCSV(content);
   }
@@ -50,7 +52,36 @@
    * Fetch up to `max` items from the Europeana Search API (cursor paging).
    * Get a free API key at https://pro.europeana.eu/page/get-api
    */
-  async function fetchEuropeana({ apiKey, query, max = 200, onProgress = () => {} }) {
+  async function fetchEuropeana({ apiKey, query, max = 200, full = false, onProgress = () => {} }) {
+    const items = await searchEuropeana({ apiKey, query, max, onProgress });
+    return full ? fetchRecords({ apiKey, ids: items.map((i) => i.id), onProgress }) : items;
+  }
+
+  /**
+   * Fetch full records (Record API) so the provider proxy can be compared with
+   * the Europeana proxy (needed by the data-conversion rules).
+   */
+  async function fetchRecords({ apiKey, ids, concurrency = 6, onProgress = () => {} }) {
+    const out = new Array(ids.length);
+    let next = 0;
+    let done = 0;
+    async function worker() {
+      while (next < ids.length) {
+        const i = next;
+        next += 1;
+        const res = await fetch(`https://api.europeana.eu/record/v2${ids[i]}.json?wskey=${encodeURIComponent(apiKey)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) throw new Error(data.error || `Record API responded with HTTP ${res.status} for ${ids[i]}`);
+        out[i] = data.object;
+        done += 1;
+        onProgress(done, ids.length, 'records');
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
+    return out;
+  }
+
+  async function searchEuropeana({ apiKey, query, max, onProgress }) {
     const items = [];
     let cursor = '*';
     while (cursor && items.length < max) {
@@ -69,5 +100,5 @@
     return items.slice(0, max);
   }
 
-  return { parseCSV, parseFile, fetchEuropeana };
+  return { parseCSV, parseFile, fetchEuropeana, fetchRecords };
 });
