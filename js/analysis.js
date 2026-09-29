@@ -208,7 +208,7 @@
 
   const HEADER_ALIASES = {
     dctitle: 'dcTitle', title: 'dcTitle',
-    dcdate: 'dcDate', date: 'dcDate', year: 'dcDate',
+    dcdate: 'dcDate', date: 'dcDate', year: 'year', edmyear: 'year',
     dctermscreated: 'dctermsCreated', created: 'dctermsCreated',
     dccreator: 'dcCreator', creator: 'dcCreator', author: 'dcCreator', photographer: 'dcCreator',
     dccontributor: 'dcContributor', contributor: 'dcContributor',
@@ -245,7 +245,7 @@
 
   function emptyRecord() {
     return {
-      id: '', provider: '', link: '', identifier: [], sameAs: [],
+      id: '', provider: '', link: '', identifier: [], sameAs: [], year: [], derived: {},
       values: Object.fromEntries(FIELDS.map((f) => [f.key, []])), target: null,
     };
   }
@@ -279,6 +279,7 @@
     const country = langValues(o.europeanaAggregation && o.europeanaAggregation.edmCountry);
     record.values.edmCountry = country;
     record.target.edmCountry = country;
+    record.year = uniq([...langValues(europeanaProxy && europeanaProxy.year), ...langValues(o.year)]);
     record.id = text(o.about);
     record.identifier = langValues(providerProxy.dcIdentifier);
     record.sameAs = langValues((o.providedCHOs || []).map((c) => c.owlSameAs));
@@ -290,7 +291,7 @@
   /** Europeana Search API item (profile=rich). Earlier keys win. */
   const SEARCH_KEYS = {
     dcTitle: ['dcTitleLangAware', 'title'],
-    dcDate: ['dcDateLangAware', 'dcDate', 'year'],
+    dcDate: ['dcDateLangAware', 'dcDate'],
     dctermsCreated: ['dctermsCreatedLangAware', 'dctermsCreated'],
     dcCreator: ['dcCreatorLangAware', 'dcCreator'],
     dcContributor: ['dcContributorLangAware', 'dcContributor'],
@@ -308,6 +309,7 @@
       const key = keys.find((k) => langValues(item[k]).length);
       record.values[field] = key ? uniq(langValues(item[key])) : [];
     }
+    record.year = langValues(item.year);
     record.id = text(item.id);
     record.identifier = langValues(item.dcIdentifier);
     record.provider = text(langValues(item.dataProvider)[0]);
@@ -327,7 +329,7 @@
         const values = splitCell(key, value);
         if (isTarget) (record.target = record.target || {})[key] = values;
         else record.values[key] = values;
-      } else if (key === 'identifier' || key === 'sameAs') {
+      } else if (key === 'identifier' || key === 'sameAs' || key === 'year') {
         record[key] = splitCell(key, value);
       } else {
         record[key] = text(Array.isArray(value) ? value[0] : value);
@@ -342,7 +344,14 @@
       if (row && (row.proxies || (row.object && row.object.proxies))) return fromRecordApi(row);
       if (row && (Object.keys(row).some((k) => /LangAware$|^edm[A-Z]/.test(k)) || Array.isArray(row.title))) return fromSearchItem(row);
       return fromRow(row);
-    }).map((r, i) => ({ ...r, id: r.id || `record-${i + 1}` }));
+    }).map((r, i) => {
+      // "dctermsCreated / year": Europeana's normalised year stands in when dctermsCreated is empty
+      if (!r.values.dctermsCreated.some((v) => !isPlaceholder(v)) && r.year.length) {
+        r.values.dctermsCreated = uniq(r.year);
+        r.derived.dctermsCreated = 'year';
+      }
+      return { ...r, id: r.id || `record-${i + 1}` };
+    });
   }
 
   // ================================================================= groups
@@ -373,6 +382,24 @@
     return s.replace(/ies$/, 'y').replace(/(s|x|ch|sh)es$/, '$1').replace(/([^s])s$/, '$1');
   }
   const looseKey = (v) => depluralise(fold(v).replace(/^the\s+/, '').replace(/[^a-z0-9]/g, ''));
+
+  // ======================================================= vague descriptions
+
+  const BOILERPLATE = /^(untitled|no title|without title|photo(graph)?s?|image|picture|object|item|document|scan|digiti[sz]ed (image|object)|no description( available)?|description|see (title|image)|not described|tbc|n\.?\/?a)\.?$/i;
+
+  /** Why a title or description says little about the object, or null. */
+  function vagueReason(record, field, v) {
+    const bare = v.replace(/^[\s"'“”‘’[(]+|[\s"'“”‘’\])].?$/g, '').trim();
+    if (BOILERPLATE.test(bare)) return `"${v}" is placeholder text`;
+    if (field === 'dcDescription') {
+      const words = v.split(/\s+/).filter((w) => /\p{L}/u.test(w));
+      const titles = record.values.dcTitle.map((t) => fold(t).replace(/[^a-z0-9]+/g, ' ').trim()).filter(Boolean);
+      const body = fold(v).replace(/[^a-z0-9]+/g, ' ').trim();
+      if (titles.includes(body)) return 'the description only repeats the title';
+      if (words.length < 5) return `only ${words.length} word${words.length === 1 ? '' : 's'}`;
+    }
+    return null;
+  }
 
   // ============================================================== time spans
 
@@ -656,7 +683,9 @@
           else if (v.replace(/[^\p{L}]/gu, '').length <= 2) reason = 'Entry is only one or two letters';
           else if (v.length === 255 || v.length === 256) reason = 'Entry stops exactly at a field-length limit';
           else if (/^\p{L}{1,5}\.$/u.test(v)) reason = 'Entry is an abbreviation';
-          if (reason) flag(record, 'EXT-UI-LING-INCOM', field, i, { reason });
+          const vague = !reason && vagueReason(record, field, v);
+          if (vague) flag(record, 'EXT-UI-LING-INCOM', field, i, { reason: `Vague / non-descriptive: ${vague}`, vague: true });
+          else if (reason) flag(record, 'EXT-UI-LING-INCOM', field, i, { reason });
         }
       }
 

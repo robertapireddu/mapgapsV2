@@ -2,39 +2,46 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MapGapsVersion2</title>
-  <meta name="description" content="Spot missing, incomplete, contested and inconsistent metadata in Europeana heritage collections.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MapGapsVersion3</title>
+  <meta name="description" content="Map the incompleteness of seven core Europeana attributes, then filter by gap dimension and type down to the record fields.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header class="topbar">
+  <header class="masthead">
     <div class="brand">
-      <h1>MapGapsVersion2</h1>
-      <p>Gaps and uncertainty in Europeana collection metadata</p>
+      <h1>MapGaps <span>Version 3</span></h1>
+      <p>Incompleteness in Europeana collection metadata, attribute by attribute</p>
     </div>
 
     <details class="source" id="source">
       <summary><span id="source-label">Sample collection</span> · <span id="record-count">0</span> records</summary>
       <div class="source-panel">
         <section>
-          <h2>Europeana Search API</h2>
+          <h2>Europeana API</h2>
           <form id="europeana-form">
-            <label>API key <input name="apiKey" required autocomplete="off" placeholder="your wskey"></label>
-            <label>Query <input name="query" placeholder='e.g. roma OR DATA_PROVIDER:"…"'></label>
-            <label>Max records <input name="max" type="number" min="1" max="1000" value="200"></label>
-            <label class="check"><input type="checkbox" name="full" checked> Full records (Record API): compares the provider and Europeana proxies, needed for data-conversion rules; slower</label>
+            <label for="api-key">API key</label>
+            <input id="api-key" name="apiKey" required autocomplete="off" placeholder="your wskey">
+            <label for="query">Query</label>
+            <input id="query" name="query" placeholder='e.g. roma OR DATA_PROVIDER:"…"'>
+            <label for="max">Max records</label>
+            <input id="max" name="max" type="number" min="1" max="1000" value="200">
+            <label class="check" for="full"><input type="checkbox" id="full" name="full" checked> Full records: compare provider and Europeana proxies (slower)</label>
             <button type="submit">Fetch records</button>
             <p class="hint">Free key at <a href="https://pro.europeana.eu/page/get-api" target="_blank" rel="noopener">pro.europeana.eu</a>.</p>
           </form>
         </section>
         <section>
           <h2>File</h2>
-          <label class="file">CSV or JSON <input type="file" id="file-input" accept=".csv,.json,text/csv,application/json"></label>
-          <p class="hint">CSV with Europeana/Dublin Core headers (<code>dcTitle</code> or <code>dc:title</code>, <code>dcDate</code>, <code>dcCoverage</code>, <code>edmCountry</code>…; prefix a column with <code>europeana:</code> for Europeana-proxy values), or a saved Search / Record API response.</p>
+          <label class="file" for="file-input">CSV or JSON</label>
+          <input type="file" id="file-input" accept=".csv,.json,text/csv,application/json">
+          <p class="hint">CSV with <code>dcTitle</code>, <code>dcDescription</code>, <code>dcSubject</code>, <code>dcCreator</code>, <code>dctermsCreated</code> or <code>year</code>, <code>edmCountry</code>, <code>dcType</code> columns, or a saved Europeana Search / Record API response.</p>
         </section>
         <section>
-          <button type="button" id="use-sample" class="ghost">Back to sample collection</button>
+          <button type="button" id="use-sample" class="ghost">Back to the sample collection</button>
           <p class="hint">The sample records are synthetic.</p>
         </section>
         <p class="status" id="source-status" role="status"></p>
@@ -42,67 +49,61 @@
     </details>
   </header>
 
-  <section class="filters" aria-label="Filters">
-    <fieldset class="filter">
-      <legend>Filter 1 · Gap</legend>
-      <div class="segmented">
-        <label><input type="radio" name="mode" value="uncertain" checked><span>Uncertain</span></label>
-        <label><input type="radio" name="mode" value="missing"><span>Missing</span></label>
-      </div>
-    </fieldset>
-
-    <fieldset class="filter">
-      <legend>Filter 2 · Dimension</legend>
-      <select id="dimension" aria-label="Dimension"></select>
-    </fieldset>
-
-    <fieldset class="filter" id="type-filter">
-      <legend>Filter 3 · Uncertainty</legend>
-      <div class="types" id="types"></div>
-    </fieldset>
-
-    <fieldset class="filter">
-      <legend>Origin</legend>
-      <div class="origins" id="origins"></div>
-    </fieldset>
+  <section class="filters" aria-label="Choose which gaps to see">
+    <div class="filter">
+      <span class="filter-label" id="dimension-label">Dimension</span>
+      <div class="seg" role="radiogroup" aria-labelledby="dimension-label" id="dimension-filter"></div>
+    </div>
+    <div class="filter">
+      <span class="filter-label" id="type-label">Gap type</span>
+      <div class="seg" role="radiogroup" aria-labelledby="type-label" id="type-filter"></div>
+    </div>
+    <div class="filter">
+      <span class="filter-label" id="origin-label">Origin</span>
+      <div class="chips" role="group" aria-labelledby="origin-label" id="origin-filter"></div>
+    </div>
+    <p class="filter-summary" id="filter-summary" aria-live="polite"></p>
   </section>
 
-  <main class="layout">
-    <aside class="left">
-      <section class="card" aria-labelledby="overview-title">
-        <div class="card-head">
-          <h2 id="overview-title">Completeness overview</h2>
-          <ul class="legend">
-            <li><i class="sw sw-complete"></i>Complete</li>
-            <li><i class="sw sw-incomplete"></i>Incomplete</li>
-            <li><i class="sw sw-missing"></i>Missing</li>
-          </ul>
-        </div>
-        <div id="overview" class="overview"></div>
-      </section>
+  <section class="attributes" aria-labelledby="attributes-title">
+    <div class="section-head">
+      <h2 id="attributes-title">Incompleteness by attribute</h2>
+      <ul class="legend" aria-label="Legend">
+        <li><i class="sw s-complete"></i>Complete</li>
+        <li><i class="sw s-incomplete"></i>Incomplete</li>
+        <li><i class="sw s-missing"></i>Missing</li>
+        <li><i class="mk mk-inconsistent"></i>Inconsistent</li>
+        <li><i class="mk mk-contested"></i>Contested</li>
+      </ul>
+    </div>
+    <div class="attr-grid" id="attributes"></div>
+  </section>
 
-      <section class="card" aria-labelledby="grid-title">
-        <div class="card-head">
-          <h2 id="grid-title">Records</h2>
-          <p class="sub" id="grid-sub"></p>
+  <main class="workbench">
+    <section class="map" aria-labelledby="map-title">
+      <div class="section-head">
+        <div>
+          <h2 id="map-title">Incompleteness map</h2>
+          <p class="sub" id="map-sub"></p>
         </div>
-        <div id="grid" class="grid" role="listbox" aria-labelledby="grid-title"></div>
-        <div class="scale" id="scale"></div>
-      </section>
-
-      <section class="card" aria-labelledby="rules-title">
-        <div class="card-head">
-          <h2 id="rules-title">Taxonomy rules in view</h2>
-          <p class="sub" id="rules-sub"></p>
-        </div>
+        <label class="check" for="only-gaps"><input type="checkbox" id="only-gaps" checked> Only records with gaps in view</label>
+      </div>
+      <div class="matrix-wrap">
+        <table class="matrix" id="matrix">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <details class="rules-panel">
+        <summary>Taxonomy rules in view</summary>
         <ul class="rules" id="rules"></ul>
-      </section>
-    </aside>
-
-    <section class="right" aria-live="polite">
-      <div id="record" class="record"></div>
+      </details>
     </section>
+
+    <aside class="record" id="record" aria-live="polite" aria-label="Selected record"></aside>
   </main>
+
+  <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
 
   <dialog id="similar" class="similar" aria-labelledby="similar-title">
     <form method="dialog" class="similar-head">
@@ -113,7 +114,7 @@
       <button class="close" aria-label="Close">×</button>
     </form>
     <p class="note" id="similar-note"></p>
-    <div class="chips" id="similar-variants" role="group" aria-label="Variants"></div>
+    <div class="chips-row" id="similar-variants" role="group" aria-label="Forms of the term"></div>
     <ol class="similar-list" id="similar-list"></ol>
   </dialog>
 

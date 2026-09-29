@@ -1,4 +1,4 @@
-/* MapGaps user interface. */
+/* MapGaps Version 3 user interface: attribute-first incompleteness map. */
 (function () {
   'use strict';
 
@@ -6,24 +6,46 @@
   const IO = window.MapGapsIO;
   const TAXONOMY = window.MAPGAPS_TAXONOMY;
   const VOCABULARY = window.MAPGAPS_VOCABULARY || {};
-
-  const TYPE_LABEL = Object.fromEntries(A.TYPES.map((t) => [t.id, t.label]));
-  const ORIGIN_LABEL = Object.fromEntries(A.ORIGINS.map((o) => [o.id, o.label]));
   const RULES = Object.fromEntries(TAXONOMY.rules.map((r) => [r.id, r]));
-  const UNCERTAIN_TYPES = ['inconsistent', 'incomplete', 'contested'];
-  const TYPE_COLOUR = {
-    inconsistent: 'var(--inconsistent)', incomplete: 'var(--incomplete)',
-    contested: 'var(--contested)', missing: 'var(--missing)',
+
+  /** The seven attributes the dashboard maps, in reading order. */
+  const ATTRIBUTES = [
+    { key: 'dcTitle', name: 'Title', short: 'Title', dimension: 'Linguistic', role: 'Baseline identification of the object' },
+    { key: 'dcDescription', name: 'Description', short: 'Descr.', dimension: 'Linguistic', role: 'Main descriptive content: vague or non-descriptive text matters most here' },
+    { key: 'dcSubject', name: 'Subject', short: 'Subject', dimension: 'Linguistic', role: 'What the object is about' },
+    { key: 'dcCreator', name: 'Creator', short: 'Creator', dimension: 'Attributional', role: 'Who made it' },
+    { key: 'dctermsCreated', name: 'Created / year', short: 'Created', field: 'dctermsCreated · year', dimension: 'Temporal · intrinsic', role: 'When it was made' },
+    { key: 'edmCountry', name: 'Country', short: 'Country', dimension: 'Spatial · intrinsic', role: 'Place of origin' },
+    { key: 'dcType', name: 'Type', short: 'Type', dimension: 'Linguistic', role: 'Genre or category: gives interpretive context' },
+  ];
+  const ATTR_KEYS = ATTRIBUTES.map((a) => a.key);
+  const ATTR_BY_KEY = Object.fromEntries(ATTRIBUTES.map((a) => [a.key, a]));
+  const CONTEXT_FIELDS = ['dcDate', 'dcCoverage', 'dctermsProvenance', 'dcContributor'];
+
+  const DIMENSIONS = [{ id: 'all', label: 'All' }, ...A.DIMENSIONS];
+  const TYPES = [
+    { id: 'all', label: 'All gaps' },
+    { id: 'missing', label: 'Missing' },
+    { id: 'incomplete', label: 'Incomplete' },
+    { id: 'inconsistent', label: 'Inconsistent' },
+    { id: 'contested', label: 'Contested' },
+  ];
+  const TYPE_LABEL = Object.fromEntries(A.TYPES.map((t) => [t.id, t.label]));
+  const ORIGIN_LABEL = {
+    Epistemic: 'Intrinsic · epistemic', 'User input': 'Extrinsic · user input',
+    'Data conversion': 'Extrinsic · data conversion', 'Empty field': 'Empty field',
   };
   const TYPE_PRIORITY = ['inconsistent', 'contested', 'incomplete', 'missing'];
 
   const state = {
     analysis: null,
-    filter: {
-      mode: 'uncertain', dimension: 'temporal', type: 'incomplete',
-      origins: new Set(A.ORIGINS.map((o) => o.id)),
-    },
+    dimension: 'all',
+    type: 'all',
+    origins: new Set(Object.keys(ORIGIN_LABEL)),
+    focus: null, // attribute key picked from the cards
+    onlyGaps: true,
     selectedId: null,
+    selectedField: null,
     popup: { groupId: null, variant: null },
   };
 
@@ -33,19 +55,66 @@
     for (const [k, v] of Object.entries(props)) {
       if (k === 'class') node.className = v;
       else if (k === 'style') node.style.cssText = v;
-      else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+      else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
       else if (v !== false && v != null) node.setAttribute(k, v === true ? '' : v);
     }
     for (const c of children.flat()) if (c != null && c !== false) node.append(c);
     return node;
   };
   const dot = (type) => el('i', { class: `dot ${type}`, 'aria-hidden': 'true' });
+  const pct = (n, total) => (total ? Math.round((100 * n) / total) : 0);
+  const recordTitle = (r) => r.values.dcTitle[0] || r.id;
+
+  // ------------------------------------------------------------ filters → flags
+
+  const inDimension = (key) => state.dimension === 'all' || A.dimensionsOf(TAXONOMY, key).includes(state.dimension);
+  const attrsInView = () => ATTR_KEYS.filter((k) => inDimension(k) && (!state.focus || state.focus === k));
+
+  /** Flags on one attribute of a record that pass the dimension, type and origin filters. */
+  function flagsInView(record, key, { ignoreType = false } = {}) {
+    return record.flags.filter((f) => f.field === key &&
+      (state.dimension === 'all' || f.dimension === state.dimension) &&
+      (ignoreType || state.type === 'all' || f.type === state.type) &&
+      state.origins.has(f.origin));
+  }
+
+  /** How one matrix cell looks under the current filters. */
+  function cellState(record, key) {
+    if (!attrsInView().includes(key)) return { cls: 's-off', flags: [] };
+    const flags = flagsInView(record, key);
+    if (state.type !== 'all') return { cls: flags.length ? `h-${state.type}` : 's-clear', flags };
+    const types = new Set(flags.map((f) => f.type));
+    const cls = types.has('missing') ? 's-missing' : types.has('incomplete') ? 's-incomplete' : 's-complete';
+    return { cls, flags, inconsistent: types.has('inconsistent'), contested: types.has('contested') };
+  }
+
+  /** Incompleteness level over the seven attributes: missing counts 1, incomplete ½. */
+  function levelOf(record) {
+    let score = 0;
+    for (const key of ATTR_KEYS) {
+      const s = A.completenessOf(record, key);
+      score += s === 'missing' ? 1 : s === 'incomplete' ? 0.5 : 0;
+    }
+    return score / ATTR_KEYS.length;
+  }
+
+  function rows() {
+    const keys = attrsInView();
+    return state.analysis.records
+      .map((record) => {
+        const gaps = keys.filter((k) => flagsInView(record, k).length).length;
+        return { record, gaps, level: levelOf(record) };
+      })
+      .filter((r) => !state.onlyGaps || r.gaps > 0)
+      .sort((a, b) => b.gaps - a.gaps || b.level - a.level);
+  }
 
   // ---------------------------------------------------------------- data
 
-  function load(rows, label) {
-    state.analysis = A.analyse(rows, { taxonomy: TAXONOMY, vocabulary: VOCABULARY });
+  function load(input, label) {
+    state.analysis = A.analyse(input, { taxonomy: TAXONOMY, vocabulary: VOCABULARY });
     state.selectedId = null;
+    state.selectedField = null;
     $('#source-label').textContent = label;
     $('#record-count').textContent = state.analysis.records.length;
     render();
@@ -61,10 +130,10 @@
     const file = e.target.files[0];
     if (!file) return;
     try {
-      const rows = IO.parseFile(file.name, await file.text());
-      if (!rows.length) throw new Error('No records found in the file.');
-      load(rows, file.name);
-      setStatus(`Loaded ${rows.length} records from ${file.name}.`);
+      const input = IO.parseFile(file.name, await file.text());
+      if (!input.length) throw new Error('No records found in the file.');
+      load(input, file.name);
+      setStatus(`Loaded ${input.length} records from ${file.name}.`);
       $('#source').open = false;
     } catch (err) {
       setStatus(err.message, true);
@@ -86,12 +155,12 @@
         full: form.get('full') === 'on',
         onProgress: (n, total, what = 'results') => setStatus(`Fetched ${n} of ${total ?? '?'} ${what}…`),
       });
-      if (!items.length) throw new Error('The query returned no records.');
+      if (!items.length) throw new Error('The query returned no records. Try a broader query.');
       load(items, `Europeana: ${form.get('query').trim() || 'all'}`);
       setStatus(`Loaded ${items.length} records from Europeana.`);
       $('#source').open = false;
     } catch (err) {
-      setStatus(err.message, true);
+      setStatus(`${err.message} Check the API key and query, or load a saved file instead.`, true);
     } finally {
       button.disabled = false;
     }
@@ -103,262 +172,326 @@
     $('#source').open = false;
   });
 
-  // ------------------------------------------------------------- filters
+  $('#only-gaps').addEventListener('change', (e) => {
+    state.onlyGaps = e.target.checked;
+    render();
+  });
 
-  const originsForMode = () => (state.filter.mode === 'missing'
-    ? ['Empty field', 'Data conversion']
-    : ['Epistemic', 'User input', 'Data conversion']);
+  // ------------------------------------------------------------- filter controls
 
-  function buildFilters() {
-    const dimension = $('#dimension');
-    dimension.append(...A.DIMENSIONS.map((d) => el('option', { value: d.id }, d.label)), el('option', { value: 'all' }, 'All dimensions'));
-    dimension.value = state.filter.dimension;
-
-    $('#types').append(...UNCERTAIN_TYPES.map((t) =>
-      el('label', {},
-        el('input', { type: 'radio', name: 'type', value: t, checked: t === state.filter.type }),
-        dot(t), TYPE_LABEL[t])));
-
-    document.addEventListener('change', (e) => {
-      if (e.target === dimension) state.filter.dimension = dimension.value;
-      else if (e.target.name === 'mode') state.filter.mode = e.target.value;
-      else if (e.target.name === 'type') state.filter.type = e.target.value;
-      else if (e.target.name === 'origin') state.filter.origins[e.target.checked ? 'add' : 'delete'](e.target.value);
-      else return;
-      keepRelevantSelection();
-      render();
-    });
+  function segmented(container, options, get, set) {
+    container.replaceChildren(...options.map((o) => el('button', {
+      type: 'button', role: 'radio', 'aria-checked': String(get() === o.id),
+      onclick: () => { set(o.id); render(); },
+    }, o.id !== 'all' && TYPE_LABEL[o.id] ? dot(o.id) : null, o.label)));
   }
 
-  function renderOrigins() {
-    $('#origins').replaceChildren(...originsForMode().map((o) =>
-      el('label', { class: 'toggle' },
-        el('input', { type: 'checkbox', name: 'origin', value: o, checked: state.filter.origins.has(o) }),
-        el('span', {}, ORIGIN_LABEL[o]))));
-  }
+  function renderFilters() {
+    segmented($('#dimension-filter'), DIMENSIONS, () => state.dimension, (v) => { state.dimension = v; });
+    segmented($('#type-filter'), TYPES, () => state.type, (v) => { state.type = v; });
+    $('#origin-filter').replaceChildren(...Object.entries(ORIGIN_LABEL).map(([id, label]) => el('button', {
+      type: 'button', class: 'chip-toggle', 'aria-pressed': String(state.origins.has(id)),
+      onclick: () => { state.origins[state.origins.has(id) ? 'delete' : 'add'](id); render(); },
+    }, label)));
 
-  /** After a filter change, jump to the top record if the selected one has nothing to show. */
-  function keepRelevantSelection() {
-    const current = state.analysis.records.find((r) => r.id === state.selectedId);
-    if (current && A.flaggedFieldCount(current, state.filter)) return;
-    const top = sortedRecords()[0];
-    if (top && top.n) state.selectedId = top.record.id;
+    const dim = state.dimension === 'all' ? 'all dimensions' : `${state.dimension} gaps`;
+    const type = state.type === 'all' ? 'every gap type' : state.type;
+    const names = attrsInView().map((k) => ATTR_BY_KEY[k].name);
+    $('#filter-summary').replaceChildren(el('span', {},
+      'Showing ', el('b', {}, dim), ', ', el('b', {}, type),
+      names.length ? [' in ', el('b', {}, names.join(', '))] : ' (no attribute is checked for this dimension)',
+      state.focus ? [' · ', el('button', { type: 'button', class: 'linkish', onclick: () => { state.focus = null; render(); } }, 'show all attributes')] : ''));
   }
-
-  const activeType = () => (state.filter.mode === 'missing' ? 'missing' : state.filter.type);
-  const fieldInDimension = (key) => state.filter.dimension === 'all' ||
-    A.dimensionsOf(TAXONOMY, key).includes(state.filter.dimension);
 
   // ------------------------------------------------------------- render
 
   function render() {
-    $('#type-filter').disabled = state.filter.mode === 'missing';
-    renderOrigins();
-    renderOverview();
-    renderGrid();
+    hideTooltip();
+    renderFilters();
+    renderAttributes();
+    const list = rows();
+    if (!state.selectedId || !state.analysis.records.some((r) => r.id === state.selectedId) ||
+        (list.length && !list.some((r) => r.record.id === state.selectedId))) {
+      state.selectedId = list[0] ? list[0].record.id : (state.analysis.records[0] || {}).id;
+      state.selectedField = null;
+    }
+    renderMatrix(list);
     renderRules();
     renderRecord();
   }
 
-  function renderOverview() {
-    const head = el('div', { class: 'ov-row ov-head' }, el('span', {}, 'Field'), el('span', {}, 'Share of records'), el('span', {}, 'Complete'));
-    const rows = state.analysis.fieldStats.map((s) => {
-      const pct = (n) => (s.total ? (100 * n) / s.total : 0);
-      return el('div', {
-        class: `ov-row${fieldInDimension(s.key) ? '' : ' dim'}`,
-        title: `${s.label} (${s.dimensions.join(', ')}): ${s.missing} missing, ${s.incomplete} incomplete, ${s.complete} complete`,
+  function renderAttributes() {
+    const stats = Object.fromEntries(state.analysis.fieldStats.map((s) => [s.key, s]));
+    const records = state.analysis.records;
+    $('#attributes').replaceChildren(...ATTRIBUTES.map((a) => {
+      const s = stats[a.key];
+      const count = (pred) => records.filter((r) => r.flags.some((f) => f.field === a.key && pred(f))).length;
+      const inconsistent = count((f) => f.type === 'inconsistent');
+      const contested = count((f) => f.type === 'contested');
+      const vague = count((f) => f.vague);
+      const derived = records.filter((r) => r.derived && r.derived[a.key]).length;
+      const view = attrsInView().includes(a.key);
+      return el('button', {
+        type: 'button',
+        class: `attr${view ? ' in-view' : ''}${!inDimension(a.key) || (state.focus && state.focus !== a.key) ? ' out' : ''}`,
+        'aria-pressed': String(state.focus === a.key),
+        title: state.focus === a.key ? 'Show all attributes again' : `Focus the map on ${a.name}`,
+        onclick: () => { state.focus = state.focus === a.key ? null : a.key; render(); },
       },
-      el('span', { class: 'ov-label' }, s.label),
-      el('span', { class: 'ov-bar', role: 'img', 'aria-label': `${s.label}: ${Math.round(pct(s.missing))}% missing, ${Math.round(pct(s.incomplete))}% incomplete` },
-        el('i', { class: 'missing', style: `width:${pct(s.missing)}%` }),
-        el('i', { class: 'incomplete', style: `width:${pct(s.incomplete)}%` })),
-      el('span', { class: 'ov-pct' }, `${Math.round(pct(s.complete))}%`));
-    });
-    $('#overview').replaceChildren(head, ...rows);
+      el('span', { class: 'attr-dim' }, a.dimension),
+      el('span', { class: 'attr-name' }, el('b', {}, a.name)),
+      el('span', { class: 'attr-field' }, a.field || a.key),
+      el('span', { class: 'attr-role' }, a.role),
+      el('span', { class: 'attr-pct' }, el('b', {}, `${pct(s.complete, s.total)}%`), 'complete'),
+      el('span', { class: 'bar', role: 'img', 'aria-label': `${a.name}: ${pct(s.complete, s.total)}% complete, ${pct(s.incomplete, s.total)}% incomplete, ${pct(s.missing, s.total)}% missing` },
+        el('i', { class: 'complete', style: `flex:${s.complete}` }),
+        el('i', { class: 'incomplete', style: `flex:${s.incomplete}` }),
+        el('i', { class: 'missing', style: `flex:${s.missing}` })),
+      el('span', { class: 'attr-gaps' },
+        el('span', {}, `${pct(s.incomplete, s.total)}% incomplete`),
+        el('span', {}, `${pct(s.missing, s.total)}% missing`),
+        inconsistent ? el('span', {}, el('i', { class: 'mk mk-inconsistent' }), `${inconsistent} inconsistent`) : null,
+        contested ? el('span', {}, el('i', { class: 'mk mk-contested' }), `${contested} contested`) : null,
+        vague ? el('span', {}, `${vague} vague`) : null,
+        derived ? el('span', {}, `${derived} from year`) : null));
+    }));
   }
 
-  function sortedRecords() {
-    return state.analysis.records
-      .map((r) => ({ record: r, n: A.flaggedFieldCount(r, state.filter), flags: A.matchingFlags(r, state.filter).length }))
-      .sort((a, b) => b.n - a.n || b.flags - a.flags || b.record.flags.length - a.record.flags.length);
-  }
+  function renderMatrix(list) {
+    const view = attrsInView();
+    $('#matrix thead').replaceChildren(el('tr', {},
+      el('th', { class: 'rec-h', scope: 'col' }, 'Record'),
+      ...ATTRIBUTES.map((a) => el('th', { scope: 'col', class: view.includes(a.key) ? '' : 'out', title: a.role }, a.short, el('span', { class: 'mono' }, a.key === 'dctermsCreated' ? 'created' : a.key.replace(/^(dc|edm)/, '').toLowerCase()))),
+      el('th', { scope: 'col', title: 'Share of the seven attributes that are missing (1) or incomplete (½)' }, 'Level')));
 
-  function intensity(n, max) {
-    if (!n) return '0%';
-    const steps = [35, 55, 75, 100];
-    return `${steps[Math.min(steps.length - 1, Math.ceil((n / max) * steps.length) - 1)]}%`;
-  }
+    const total = state.analysis.records.length;
+    $('#map-sub').textContent = state.onlyGaps
+      ? `${list.length} of ${total} records have gaps in view · sorted by attributes affected, then incompleteness level`
+      : `${total} records · sorted by attributes affected, then incompleteness level`;
 
-  const recordTitle = (r) => r.values.dcTitle[0] || r.id;
-
-  function renderGrid() {
-    const list = sortedRecords();
-    const max = Math.max(1, ...list.map((x) => x.n));
-    const type = activeType();
-    const flagged = list.filter((x) => x.n > 0).length;
-    const dim = state.filter.dimension === 'all' ? 'all dimensions' : state.filter.dimension;
-
-    $('#grid-title').textContent = `Records · ${TYPE_LABEL[type].toLowerCase()} (${dim})`;
-    $('#grid-sub').textContent = `${flagged} of ${list.length} flagged · most to least flagged fields`;
-
-    if (!state.selectedId || !state.analysis.records.some((r) => r.id === state.selectedId)) {
-      state.selectedId = list[0] && list[0].record.id;
+    if (!list.length) {
+      $('#matrix tbody').replaceChildren(el('tr', { class: 'empty-row' }, el('td', { colspan: ATTRIBUTES.length + 2 },
+        'No record has gaps for this selection. Choose another dimension or gap type, or turn on more origins.')));
+      return;
     }
 
-    $('#grid').replaceChildren(...list.map(({ record, n }) =>
-      el('button', {
-        class: 'tile', role: 'option', 'data-n': n, 'aria-selected': String(record.id === state.selectedId),
-        style: `--c:${TYPE_COLOUR[type]};--k:${intensity(n, max)}`,
-        title: `${recordTitle(record)}\n${n} ${TYPE_LABEL[type].toLowerCase()} field${n === 1 ? '' : 's'}`,
-        'aria-label': `${recordTitle(record)}: ${n} flagged fields`,
-        onclick: () => select(record.id),
-      }, n || '')));
-
-    const scaleSteps = ['0%', '35%', '55%', '75%', '100%'];
-    $('#scale').replaceChildren('fewer',
-      ...scaleSteps.map((k) => el('i', { style: k === '0%' ? '' : `background:color-mix(in srgb, ${TYPE_COLOUR[type]} ${k}, var(--surface));border-color:transparent` })),
-      `more flagged fields (max ${max})`);
+    $('#matrix tbody').replaceChildren(...list.map(({ record, level }) => {
+      const selected = record.id === state.selectedId;
+      return el('tr', { class: selected ? 'selected' : '' },
+        el('td', { class: 'rec' }, el('button', {
+          type: 'button', class: 'rec-btn', onclick: () => select(record.id, null),
+        }, el('b', {}, recordTitle(record)), el('span', {}, record.id))),
+        ...ATTRIBUTES.map((a) => {
+          const s = cellState(record, a.key);
+          const n = state.type !== 'all' && s.flags.length > 1 ? s.flags.length : null;
+          return el('td', { class: 'c' }, el('button', {
+            type: 'button', class: `cell ${s.cls}`,
+            'aria-label': `${recordTitle(record)}, ${a.name}: ${describeCell(record, a.key, s)}`,
+            onclick: () => select(record.id, a.key),
+            onmouseenter: (e) => showTooltip(e.currentTarget, record, a, s),
+            onfocus: (e) => showTooltip(e.currentTarget, record, a, s),
+            onmouseleave: hideTooltip, onblur: hideTooltip,
+          },
+          s.inconsistent ? el('i', { class: 'm-inc' }) : null,
+          s.contested ? el('i', { class: 'm-con' }) : null,
+          n ? el('span', { class: 'n' }, n) : null));
+        }),
+        el('td', { class: 'lvl' }, el('span', { class: 'lvl-bar' }, el('i', { style: `--w:${Math.round(level * 100)}%` }), `${Math.round(level * 100)}%`)));
+    }));
   }
+
+  function describeCell(record, key, s) {
+    if (s.cls === 's-off') return 'not checked for this dimension';
+    if (state.type === 'all') {
+      const base = A.completenessOf(record, key);
+      const extra = [s.inconsistent && 'inconsistent', s.contested && 'contested'].filter(Boolean);
+      const shown = s.cls === 's-missing' ? 'missing' : s.cls === 's-incomplete' ? 'incomplete' : base === 'complete' ? 'complete' : 'no gaps in view';
+      return [shown, ...extra].join(', ');
+    }
+    return s.flags.length ? `${s.flags.length} ${state.type} flag${s.flags.length > 1 ? 's' : ''}` : `no ${state.type} gaps`;
+  }
+
+  // ------------------------------------------------------------- tooltip
+
+  function showTooltip(anchor, record, attr, s) {
+    const tip = $('#tooltip');
+    const reasons = s.flags.slice(0, 4).map((f) => el('li', {}, `${f.code}: ${f.reason}`));
+    tip.replaceChildren(...[
+      el('b', {}, recordTitle(record)),
+      el('span', { class: 't-state' }, `${attr.name} · ${describeCell(record, attr.key, s)}`),
+      reasons.length ? el('ul', {}, ...reasons) : null,
+      s.flags.length > 4 ? el('div', {}, `+ ${s.flags.length - 4} more`) : null].filter(Boolean));
+    tip.hidden = false;
+    const r = anchor.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    const h = tip.offsetHeight;
+    let left = r.left + r.width / 2 - w / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+    const top = r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  }
+  function hideTooltip() {
+    const tip = $('#tooltip');
+    if (tip) tip.hidden = true;
+  }
+  window.addEventListener('scroll', hideTooltip, true);
+
+  // ------------------------------------------------------------- rules
 
   function renderRules() {
     const counts = new Map();
     for (const r of state.analysis.records) {
-      for (const f of A.matchingFlags(r, state.filter)) {
-        if (!counts.has(f.rule)) counts.set(f.rule, new Set());
-        counts.get(f.rule).add(r.id);
+      for (const key of attrsInView()) {
+        for (const f of flagsInView(r, key)) {
+          if (!counts.has(f.rule)) counts.set(f.rule, new Set());
+          counts.get(f.rule).add(r.id);
+        }
       }
     }
-    const type = activeType();
-    const relevant = TAXONOMY.rules.filter((rule) =>
-      (state.filter.dimension === 'all' || rule.dimension === state.filter.dimension) &&
-      state.filter.origins.has(rule.subCategory || 'Empty field') &&
-      (rule.type === type || counts.has(rule.id)));
-    $('#rules-sub').textContent = `from ${TAXONOMY.source}`;
+    const relevant = TAXONOMY.rules.filter((rule) => rule.fields.some((f) => attrsInView().includes(f)) &&
+      (state.dimension === 'all' || rule.dimension === state.dimension) &&
+      (state.type === 'all' || rule.type === state.type || counts.has(rule.id)) &&
+      state.origins.has(rule.subCategory || 'Empty field'));
     $('#rules').replaceChildren(...relevant.map((rule) => {
       const n = counts.has(rule.id) ? counts.get(rule.id).size : 0;
-      const needsProxies = /DATAC/.test(rule.id) && !state.analysis.hasProxies && !['EXT-DATAC-TEMP-INCOM', 'EXT-DATAC-TEMP-INCONS', 'EXT-DATAC-SPA-INCONS', 'EXT-DATAC-LING-INCONS', 'EXT-DATAC-LINK-INCOMP'].includes(rule.id);
-      return el('li', { class: n ? '' : 'none', title: rule.issue },
-        el('code', {}, rule.code),
+      return el('li', { class: n ? '' : 'none' },
+        el('code', { class: 'code' }, rule.code),
         el('span', { class: 'rule-issue' }, rule.issue),
-        el('span', { class: 'rule-meta' }, `${rule.scope} · ${rule.fields.join(', ')}`,
-          needsProxies ? el('em', {}, ' · needs full records (both proxies)') : null),
-        el('span', { class: 'rule-n' }, n));
+        el('span', { class: 'rule-meta' }, `${rule.scope} · ${rule.fields.filter((f) => ATTR_KEYS.includes(f)).join(', ')}`),
+        el('span', { class: 'rule-n', title: 'records flagged' }, n));
     }));
   }
 
-  function select(id) {
-    state.selectedId = id;
-    renderGrid();
-    renderRecord();
-  }
+  // ------------------------------------------------------------- record panel
 
-  // ------------------------------------------------------ record detail
+  function select(id, field) {
+    state.selectedId = id;
+    state.selectedField = field;
+    for (const tr of document.querySelectorAll('#matrix tbody tr')) tr.classList.remove('selected');
+    renderMatrix(rows());
+    renderRecord();
+    if (field) {
+      const row = document.querySelector(`.fieldrow[data-key="${field}"]`);
+      if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    if (window.matchMedia('(max-width: 1000px)').matches) $('#record').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
 
   const strongest = (flags) => TYPE_PRIORITY.find((t) => flags.some((f) => f.type === t));
 
   function renderValue(record, field, value, valueIndex) {
     const flags = record.flags.filter((f) => f.field === field && f.valueIndex === valueIndex);
-    const spanned = flags.filter((f) => f.start != null);
-    const whole = flags.filter((f) => f.start == null);
-
-    // spans: flagged terms plus terms that belong to a variant group (clickable)
     const spans = [];
-    for (const f of spanned) spans.push({ start: f.start, end: f.end, flags: [f], groupId: f.groupId, variant: f.variant });
+    for (const f of flags.filter((x) => x.start != null)) spans.push({ start: f.start, end: f.end, flags: [f], groupId: f.groupId, variant: f.variant });
     for (const t of record.terms.filter((x) => x.field === field && x.valueIndex === valueIndex)) {
-      const same = spans.find((s) => s.start === t.start && s.end === t.end);
-      if (same) { same.groupId = same.groupId || t.groupId; same.variant = same.variant || t.variant; } else spans.push({ start: t.start, end: t.end, flags: [], groupId: t.groupId, variant: t.variant });
+      spans.push({ start: t.start, end: t.end, flags: [], groupId: t.groupId, variant: t.variant });
     }
-    // merge flags that share a span, drop overlaps (longest first)
     const merged = [];
     for (const s of spans.sort((a, b) => b.end - b.start - (a.end - a.start))) {
       const same = merged.find((m) => m.start === s.start && m.end === s.end);
-      if (same) { same.flags.push(...s.flags); same.groupId = same.groupId || s.groupId; same.variant = same.variant || s.variant; continue; }
-      if (!merged.some((m) => s.start < m.end && m.start < s.end)) merged.push({ ...s, flags: [...s.flags] });
+      if (same) {
+        same.flags.push(...s.flags);
+        same.groupId = same.groupId || s.groupId;
+        same.variant = same.variant || s.variant;
+      } else if (!merged.some((m) => s.start < m.end && m.start < s.end)) merged.push({ ...s, flags: [...s.flags] });
     }
     merged.sort((a, b) => a.start - b.start);
+    // a span covering the whole value is shown as a value-level highlight
+    const wholeSpan = merged.length === 1 && merged[0].start === 0 && merged[0].end === value.length;
 
     const parts = [];
     let cursor = 0;
-    for (const s of merged) {
+    for (const s of wholeSpan ? [] : merged) {
       parts.push(value.slice(cursor, s.start));
       const type = strongest(s.flags);
-      const clickable = Boolean(s.groupId && state.analysis.groups[s.groupId]);
+      const linked = Boolean(s.groupId && state.analysis.groups[s.groupId]);
       const open = () => openSimilar(s.groupId, s.variant);
       parts.push(el('mark', {
-        class: `term${type ? ` t-${type}` : ' ref'}${clickable ? ' linked' : ''}`,
-        tabindex: clickable ? '0' : null, role: clickable ? 'button' : null,
-        title: [...s.flags.map((f) => `${f.code}: ${f.reason}`), clickable ? 'Click to see records with similar terms' : null].filter(Boolean).join('\n'),
-        onclick: clickable ? open : null,
-        onkeydown: clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } : null,
+        class: `term${type ? ` t-${type}` : ' ref'}${linked ? ' linked' : ''}`,
+        tabindex: linked ? '0' : null, role: linked ? 'button' : null,
+        title: [...s.flags.map((f) => `${f.code}: ${f.reason}`), linked ? 'Click to see records with similar terms' : null].filter(Boolean).join('\n'),
+        onclick: linked ? open : null,
+        onkeydown: linked ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } : null,
       }, value.slice(s.start, s.end)));
       cursor = s.end;
     }
     parts.push(value.slice(cursor));
-    const wholeType = strongest(whole);
-    const groupId = (whole.find((f) => f.groupId) || {}).groupId;
-    const node = el('span', { class: `value${wholeType ? ` hl-${wholeType}` : ''}${A.isPlaceholder(value) ? ' hl-missing' : ''}` }, ...parts);
-    if (groupId && state.analysis.groups[groupId] && !merged.length) {
+    const whole = flags.filter((f) => f.start == null || wholeSpan);
+    const type = strongest(whole);
+    const node = el('span', { class: `value${type ? ` hl-${type}` : ''}${A.isPlaceholder(value) ? ' hl-missing' : ''}` }, ...parts);
+    const group = wholeSpan ? merged[0] : whole.find((f) => f.groupId);
+    if (group && group.groupId && state.analysis.groups[group.groupId]) {
       node.classList.add('linked');
       node.tabIndex = 0;
-      node.title = 'Click to see the related records';
-      node.addEventListener('click', () => openSimilar(groupId, (whole.find((f) => f.groupId) || {}).variant));
+      node.setAttribute('role', 'button');
+      node.title = 'Click to see records with similar terms';
+      node.addEventListener('click', () => openSimilar(group.groupId, group.variant));
+      node.addEventListener('keydown', (e) => { if (e.key === 'Enter') openSimilar(group.groupId, group.variant); });
     }
     return node;
-  }
-
-  function reasonItem(f) {
-    return el('li', {},
-      dot(f.type),
-      el('span', {},
-        el('code', { title: (RULES[f.rule] || {}).issue || '' }, f.code), ' ',
-        el('b', {}, TYPE_LABEL[f.type].toLowerCase()), ' ',
-        f.reason,
-        el('span', { class: 'scope' }, ` · ${f.scope} · ${ORIGIN_LABEL[f.origin]}`)));
   }
 
   function renderRecord() {
     const record = state.analysis.records.find((r) => r.id === state.selectedId);
     if (!record) {
-      $('#record').replaceChildren(el('p', { class: 'empty' }, 'No records loaded.'));
+      $('#record').replaceChildren(el('p', { class: 'empty' }, 'Load a collection to see its records.'));
       return;
     }
-    const counts = {};
-    for (const f of record.flags) counts[f.type] = (counts[f.type] || 0) + 1;
+    const level = levelOf(record);
+    const states = ATTR_KEYS.map((k) => A.completenessOf(record, k));
+    const missing = states.filter((s) => s === 'missing').length;
+    const incomplete = states.filter((s) => s === 'incomplete').length;
 
-    const head = el('div', { class: 'record-head' },
+    const head = el('div', { class: 'rec-head' },
       el('p', { class: 'eyebrow' }, 'Selected record'),
       el('h2', {}, recordTitle(record)),
-      el('div', { class: 'record-meta' },
-        el('span', {}, record.id),
-        record.provider && el('span', {}, record.provider),
-        record.target && el('span', {}, 'provider + Europeana proxies'),
-        record.link && el('a', { href: record.link, target: '_blank', rel: 'noopener' }, 'View on Europeana ↗')),
-      el('div', { class: 'counts' }, ...A.TYPES.map((t) =>
-        el('span', { class: 'count' }, dot(t.id), `${counts[t.id] || 0} ${t.label.toLowerCase()}`))),
-      record.sameObject && record.sameObject.length ? el('p', { class: 'same-object' },
-        'Same object also described in: ',
-        ...record.sameObject.map((id, i) => [i ? ', ' : '', el('button', { type: 'button', class: 'linkish', onclick: () => select(id) }, id)])) : null);
+      el('div', { class: 'rec-meta' },
+        el('span', { class: 'mono' }, record.id),
+        record.provider ? el('span', {}, record.provider) : null,
+        record.link ? el('a', { href: record.link, target: '_blank', rel: 'noopener' }, 'View on Europeana ↗') : null),
+      el('div', { class: 'level' },
+        el('span', { class: 'lvl-bar' }, el('i', { style: `--w:${Math.round(level * 100)}%` }), `Incompleteness level ${Math.round(level * 100)}%`),
+        el('span', { class: 'sub' }, `${missing} missing · ${incomplete} incomplete · ${7 - missing - incomplete} complete, of 7 attributes`)),
+      record.sameObject && record.sameObject.length ? el('p', { class: 'same-object' }, 'Same object also described in ',
+        ...record.sameObject.map((id, i) => [i ? ', ' : '', el('button', { type: 'button', class: 'linkish', onclick: () => select(id, null) }, id)])) : null);
 
-    const cards = A.FIELDS.map((f) => {
-      const values = record.values[f.key];
-      const flags = record.flags.filter((x) => x.field === f.key);
-      const active = fieldInDimension(f.key);
-      const shown = flags.filter((x) => state.filter.dimension === 'all' || x.dimension === state.filter.dimension || !active);
-      const target = record.target && record.target[f.key];
-      return el('article', { class: `field ${active ? 'active' : 'inactive'}` },
-        el('div', { class: 'field-label' }, f.label, el('span', { class: 'dims' }, A.dimensionsOf(TAXONOMY, f.key).join(' · '))),
-        el('div', { class: `values${f.key === 'dcDescription' ? ' long' : ''}` },
-          values.length ? values.map((v, i) => renderValue(record, f.key, v, i)) : el('span', { class: 'value hl-missing' }, 'none')),
-        target && (target.length || values.length) ? el('p', { class: 'target' },
-          el('span', {}, 'Europeana proxy: '), target.length ? target.join(' · ') : el('em', {}, 'nothing')) : null,
-        shown.length ? el('ul', { class: 'reasons' }, ...shown.map(reasonItem)) : null);
+    const view = attrsInView();
+    const fieldRows = ATTRIBUTES.map((a) => {
+      const values = record.values[a.key];
+      const status = A.completenessOf(record, a.key);
+      const all = record.flags.filter((f) => f.field === a.key);
+      const shown = new Set(flagsInView(record, a.key));
+      const target = record.target && record.target[a.key];
+      return el('article', {
+        class: `fieldrow${view.includes(a.key) ? ' in-view' : ' out'}${state.selectedField === a.key ? ' focus' : ''}`,
+        'data-key': a.key,
+      },
+      el('div', { class: 'fieldrow-head' },
+        el('b', {}, a.name), el('span', { class: 'mono' }, a.field || a.key),
+        el('span', { class: `pill ${status}` }, status)),
+      el('div', { class: `values${a.key === 'dcDescription' ? ' long' : ''}` },
+        values.length ? values.map((v, i) => renderValue(record, a.key, v, i)) : el('span', { class: 'value none' }, 'no value')),
+      record.derived && record.derived[a.key] ? el('p', { class: 'derived' }, 'dctermsCreated is empty; value taken from Europeana\'s normalised year') : null,
+      target && (target.length || values.length) && a.key !== 'edmCountry'
+        ? el('p', { class: 'target' }, el('span', {}, 'Europeana proxy: '), target.length ? target.join(' · ') : el('em', {}, 'nothing')) : null,
+      all.length ? el('ul', { class: 'reasons' }, ...all
+        .sort((x, y) => shown.has(y) - shown.has(x))
+        .map((f) => el('li', { class: shown.has(f) ? '' : 'dim' }, dot(f.type), el('span', {},
+          el('code', { class: 'code', title: (RULES[f.rule] || {}).issue || '' }, f.code), ' ',
+          el('b', {}, TYPE_LABEL[f.type].toLowerCase()), ' ', f.reason,
+          el('span', {}, ` · ${f.scope} · ${ORIGIN_LABEL[f.origin]}`))))) : null);
     });
 
-    cards.sort((a, b) => b.classList.contains('active') - a.classList.contains('active'));
-    $('#record').replaceChildren(head, el('div', { class: 'fields' }, ...cards));
+    const context = CONTEXT_FIELDS.filter((k) => record.values[k].length);
+    const other = context.length ? el('details', { class: 'other' },
+      el('summary', {}, 'Other fields in the record'),
+      el('dl', {}, ...context.map((k) => [el('dt', {}, k), el('dd', {}, record.values[k].join(' · '))]))) : null;
+
+    $('#record').replaceChildren(...[head, el('div', { class: 'fieldrows' }, ...fieldRows), other].filter(Boolean));
   }
 
-  // -------------------------------------------------- similar-terms popup
+  // -------------------------------------------------- similar-terms pop-up
 
   function openSimilar(groupId, variant) {
     state.popup = { groupId, variant: variant || null };
@@ -373,36 +506,31 @@
     if (state.popup.variant && !group.variants.some((v) => v.key === state.popup.variant)) state.popup.variant = null;
     const rule = RULES[group.rule || (group.kind === 'vocabulary' && !group.spatial ? 'INT-LING-INCONS' : '')];
     $('#similar-title').textContent = group.label;
-    $('#similar-note').replaceChildren(
-      rule ? el('code', {}, rule.code) : '', rule ? ' ' : '',
-      group.note || '');
+    $('#similar-note').replaceChildren(rule ? el('code', { class: 'code' }, rule.code) : '', rule ? ' ' : '', group.note || '');
 
     const chip = (key, label, count, preferred) => el('button', {
       class: 'chip', type: 'button', 'aria-pressed': String(state.popup.variant === key),
       onclick: () => { state.popup.variant = key; renderSimilar(); },
     }, label, el('span', { class: 'n' }, count), preferred ? el('span', { class: 'pref' }, 'reference') : null);
-
-    $('#similar-variants').replaceChildren(
-      chip(null, 'All', group.total, false),
+    $('#similar-variants').replaceChildren(chip(null, 'All', group.total, false),
       ...group.variants.map((v) => chip(v.key, v.label, v.count, v.preferred)));
 
-    const recordById = new Map(state.analysis.records.map((r) => [r.id, r]));
+    const byId = new Map(state.analysis.records.map((r) => [r.id, r]));
     const occurrences = group.variants
       .filter((v) => !state.popup.variant || v.key === state.popup.variant)
       .flatMap((v) => v.occurrences.map((o) => ({ ...o, preferred: v.preferred })));
-
     $('#similar-list').replaceChildren(...occurrences.map((o) => {
-      const record = recordById.get(o.recordId);
+      const record = byId.get(o.recordId);
       const value = record.values[o.field][o.valueIndex];
-      const snippet = el('span', { class: 'snippet' },
+      return el('li', {}, el('button', {
+        type: 'button', onclick: () => { $('#similar').close(); select(o.recordId, ATTR_KEYS.includes(o.field) ? o.field : null); },
+      },
+      el('span', { class: 'item' }, el('b', {}, recordTitle(record)), record.id),
+      el('span', { class: 'snippet' },
         clip(value.slice(0, o.start), 'start'),
         el('mark', { class: o.preferred ? 'pref' : '' }, value.slice(o.start, o.end)),
         clip(value.slice(o.end), 'end'),
-        el('span', { class: 'field-name' }, A.FIELD_BY_KEY[o.field].label));
-      return el('li', {}, el('button', {
-        type: 'button',
-        onclick: () => { $('#similar').close(); select(o.recordId); },
-      }, el('span', { class: 'item' }, el('b', {}, recordTitle(record)), record.id), snippet));
+        el('span', { class: 'field-name' }, o.field))));
     }));
   }
 
@@ -412,11 +540,10 @@
   }
 
   $('#similar').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) e.currentTarget.close(); // backdrop click
+    if (e.target === e.currentTarget) e.currentTarget.close();
   });
 
   // ---------------------------------------------------------------- init
 
-  buildFilters();
   load(window.MAPGAPS_SAMPLE || [], 'Sample collection');
 })();

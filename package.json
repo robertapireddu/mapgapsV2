@@ -1,8 +1,8 @@
 {
-  "name": "mapgaps-v2",
-  "version": "2.0.0",
+  "name": "mapgaps",
+  "version": "3.0.0",
   "private": true,
-  "description": "Dashboard to spot missing, incomplete, contested and inconsistent metadata in Europeana heritage collections.",
+  "description": "MapGaps Version 3: attribute-first incompleteness map of Europeana collection metadata.",
   "scripts": {
     "test": "node --test tests/*.test.js",
     "sample": "node scripts/generate-sample.js",

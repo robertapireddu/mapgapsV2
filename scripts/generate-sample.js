@@ -94,6 +94,9 @@ const subjects = [
 const types = [['photograph', 10], ['Photograph', 2], ['photographs', 2], ['glass plate negative', 3], ['Photo.', 1], ['', 3]];
 
 const descriptions = [
+  [(t) => `${t}.`, 3],
+  [() => 'Photograph.', 2],
+  [() => 'No description available', 1],
   [(t) => `Black-and-white photograph, "${t}". Glass-plate negative from a documentary survey of fairs and encampments.`, 8],
   [(t) => `Photograph captioned "${t}", taken between the wars. Handwritten caption on verso.`, 4],
   [(t) => `"${t}". Victorian-style painted wagon; the caption describes the family as a primitive and exotic people.`, 2],
@@ -139,14 +142,19 @@ function makeRecord(n, base = {}) {
   const type = pick(types);
   const description = pick(descriptions)(title);
   const identifier = base.identifier || `FLA-${String(n).padStart(4, '0')}`;
+  const dateInDcDate = /^\d{4}/.test(date) && chance(0.2);
+  // edmCountry as the place of origin: mostly the object's country, sometimes a variant form, the provider's country, or absent
+  const origin = { UK: pick([['United Kingdom', 12], ['UK', 2], ['England', 1]]), RO: pick([['Romania', 12], ['Rumania', 1]]) }[countryCode];
+  const country = chance(0.08) ? null : chance(0.1) ? provider.country : origin;
 
   const providerProxy = {
     about: `/proxy/provider/9200999/${id}`,
     europeanaProxy: false,
     dcIdentifier: lang([identifier]),
     dcTitle: lang([title], 'en'),
-    dcDate: lang(date ? (chance(0.05) ? [date, '1950'] : [date]) : []),
-    dctermsCreated: lang(chance(0.08) ? ['1938'] : []),
+    // dctermsCreated is the creation date; some providers only fill dcDate (Europeana then derives "year")
+    dctermsCreated: lang(date && !dateInDcDate ? (chance(0.05) ? [date, '1950'] : [date]) : []),
+    dcDate: lang(dateInDcDate ? [date] : chance(0.08) ? ['1938'] : []),
     dcCreator: lang(creator ? [creator] : []),
     dcContributor: lang(chance(0.35) ? [pick([['Folk Life Photographic Society', 2], ['Sampson, Rose', 1]])] : []),
     dcCoverage: lang(placeValues),
@@ -159,7 +167,9 @@ function makeRecord(n, base = {}) {
     about: `/proxy/europeana/9200999/${id}`,
     europeanaProxy: true,
     dcTitle: chance(0.5) ? lang([title], 'en') : undefined,
-    dcDate: lang(targetDate(date)),
+    dctermsCreated: lang(dateInDcDate ? [] : targetDate(date)),
+    dcDate: lang(dateInDcDate ? targetDate(date) : []),
+    year: lang(/^\d{4}/.test(date) ? [date.slice(0, 4)] : []),
     dcCreator: lang(/Hartley/.test(creator) ? [entity('agents', 'Edith Hartley')] : []),
     dcCoverage: lang(placeLabel ? [entity('places', placeLabel)] : []),
     dcSubject: lang(subject.length > 1 && chance(0.4) ? [entity('concepts', subject[0])] : []),
@@ -173,7 +183,7 @@ function makeRecord(n, base = {}) {
       about: `/9200999/${id}`,
       proxies: [providerProxy, europeanaProxy],
       aggregations: [{ edmDataProvider: { def: [provider.name] } }],
-      europeanaAggregation: { edmCountry: { def: [provider.country] }, edmLandingPage: `https://www.europeana.eu/item/9200999/${id}` },
+      europeanaAggregation: { ...(country ? { edmCountry: { def: [country] } } : {}), edmLandingPage: `https://www.europeana.eu/item/9200999/${id}` },
     },
     base: { place: [placeValues, placeLabel, countryCode], provider, title, creator, date, identifier },
   };

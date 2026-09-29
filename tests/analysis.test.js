@@ -144,6 +144,18 @@ test('data-conversion rules compare the provider and Europeana proxies', () => {
   assert.ok(has(r, 'MISS-DATAC-LING', 'dcTitle'));
 });
 
+test('vague or non-descriptive titles and descriptions', () => {
+  const [repeat, short, placeholder] = run([
+    { dcTitle: 'Roma wedding', dcDescription: 'Roma wedding.' },
+    { dcTitle: 'Photograph', dcDescription: 'Family group.' },
+    { dcTitle: 'Horse fair', dcDescription: 'No description available' },
+  ]).records;
+  const vague = (r, field) => r.flags.some((f) => f.vague && f.field === field);
+  assert.ok(vague(repeat, 'dcDescription'));
+  assert.ok(vague(short, 'dcDescription') && vague(short, 'dcTitle'));
+  assert.ok(vague(placeholder, 'dcDescription'));
+});
+
 test('completeness distinguishes missing, incomplete and complete', () => {
   const { fieldStats } = run([{ dcDate: '' }, { dcDate: '1950s' }, { dcDate: '1952' }]);
   const date = fieldStats.find((s) => s.key === 'dcDate');
@@ -155,7 +167,8 @@ test('Europeana Search API items and CSV rows are mapped onto Europeana fields',
     id: '/123/abc', dataProvider: ['Museum'], title: ['A title'], dcCreatorLangAware: { def: ['Hartley, Edith'] },
     year: ['1952'], edmPlaceLabel: ['Bucharest'], country: ['romania'], dcSubjectLangAware: { en: ['Roma', 'Music'] },
   }]);
-  assert.deepEqual([item.values.dcCreator[0], item.values.dcDate[0], item.values.dcCoverage[0], item.values.edmCountry[0]], ['Hartley, Edith', '1952', 'Bucharest', 'romania']);
+  assert.deepEqual([item.values.dcCreator[0], item.values.dctermsCreated[0], item.values.dcCoverage[0], item.values.edmCountry[0]], ['Hartley, Edith', '1952', 'Bucharest', 'romania']);
+  assert.equal(item.derived.dctermsCreated, 'year', 'Europeana year stands in for an empty dctermsCreated');
   assert.deepEqual(item.values.dcSubject, ['Roma', 'Music']);
 
   const [row] = A.normaliseRecords(IO.parseCSV('dc:identifier,dc:title,dc:subject,dcterms:spatial,europeana:dcDate\n1,"Title, with comma",Roma; Gypsy,UK,1880\n'));
