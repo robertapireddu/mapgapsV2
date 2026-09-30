@@ -279,8 +279,16 @@ input  { font-family: inherit; }
 #chart-legend { display: flex; gap: 12px; align-items: center; }
 .legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--fg-3); }
 .legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-.legend-swatch.uncertain { background: var(--blue-solid); }
-.legend-swatch.missing   { background: transparent; border: 1.5px dashed var(--border-miss); }
+.legend-swatch.uncertain { /* striped dot */
+  border-radius: 50%; border: 1px solid var(--blue-solid);
+  background: repeating-linear-gradient(135deg, var(--blue-solid) 0 2px, transparent 2px 4px);
+}
+.legend-swatch.missing   { /* empty bar */
+  width: 16px; height: 8px; border-radius: 2px;
+  background: transparent; border: 1.5px solid var(--blue-solid);
+}
+.bar-segment.uncertain-seg { background: repeating-linear-gradient(135deg, var(--blue-solid) 0 2px, transparent 2px 4px); box-shadow: inset 0 0 0 1px var(--blue-solid); }
+.bar-segment.absent-seg    { background: transparent; box-shadow: inset 0 0 0 1.5px var(--blue-solid); }
 
 #bar-chart { display: flex; flex-direction: column; gap: 7px; }
 .bar-row {
@@ -325,7 +333,7 @@ input  { font-family: inherit; }
 .bar-segment.incomplete   { background: var(--c-incomplete-bar); }
 .bar-segment.inconsistent { background: var(--c-inconsistent-bar); }
 .bar-segment.contested    { background: var(--c-contested-bar); }
-.bar-segment.missing-seg  { background: var(--c-missing-bar); opacity: 0.6; }
+.bar-segment.missing-seg  { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c-missing-bar); }
 /* Dimension segments */
 .bar-segment.dim-Temporal      { background: var(--dim-temporal-bar); }
 .bar-segment.dim-Spatial       { background: var(--dim-spatial-bar); }
@@ -928,6 +936,7 @@ const RECORDS = [
     });
 
     menu.addEventListener('click', e => {
+      e.stopPropagation(); // stay open so several values can be picked
       const item = e.target.closest('.fdd-item');
       if (item) {
         const val = item.dataset.val;
@@ -1027,9 +1036,9 @@ const RECORDS = [
   //   • Issue filter only   → stacked by issue type (matching counts highlighted)
   //   • Dim filter only     → overview bars but non-matching dims are greyed
   //   • Both                → stacked by issue type, non-matching dims greyed
-  //   • Attr filter         → only highlights the row (never changes mode)
+  //   • Attr filter         → only the selected attributes are shown
   function renderBarChart() {
-    const attrs = ALL_ATTRS;
+    const attrs = state.attrs.size > 0 ? ALL_ATTRS.filter(k => state.attrs.has(k)) : ALL_ATTRS;
     const issueActive = state.issues.size > 0;
     const dimActive   = state.dims.size > 0;
     const N = RECORDS.length;
@@ -1044,12 +1053,13 @@ const RECORDS = [
           contested:    'var(--c-contested-bar)',
           missing:      'var(--c-missing-bar)',
         };
-        return `<div class="legend-item"><div class="legend-swatch" style="background:${colours[t]};opacity:${t==='missing'?.6:1}"></div> ${t}</div>`;
+        if (t === 'missing') return `<div class="legend-item"><div class="legend-swatch missing" style="border-color:${colours[t]}"></div> absent</div>`;
+        return `<div class="legend-item"><div class="legend-swatch" style="background:${colours[t]}"></div> ${t}</div>`;
       }).join('');
     } else {
       chartTitle.textContent = '% of records with any flag, by attribute';
       chartLegend.innerHTML = `
-        <div class="legend-item"><div class="legend-swatch" style="background:var(--blue-solid)"></div> uncertain</div>
+        <div class="legend-item"><div class="legend-swatch uncertain"></div> uncertain</div>
         <div class="legend-item"><div class="legend-swatch missing"></div> absent</div>
       `;
     }
@@ -1057,7 +1067,7 @@ const RECORDS = [
     // Pre-compute max for stacked mode (over all attrs, so scale stays consistent)
     let maxVal = 1;
     if (issueActive) {
-      for (const key of attrs) {
+      for (const key of ALL_ATTRS) { // all attributes, so the scale stays the same when some are hidden
         const c = attrFlagCountsByIssue(key);
         const t = c.incomplete + c.inconsistent + c.contested + c.missing;
         if (t > maxVal) maxVal = t;
@@ -1108,15 +1118,15 @@ const RECORDS = [
         } else {
           if (uncertainN > 0) {
             const seg = document.createElement('div');
-            seg.className = 'bar-segment';
-            seg.style.cssText = `width:${uncertainN / N * 100}%;background:var(--blue-solid);`;
+            seg.className = 'bar-segment uncertain-seg';
+            seg.style.width = `${uncertainN / N * 100}%`;
             track.appendChild(seg);
           }
           if (missingN > 0) {
             if (uncertainN > 0) { const sp = document.createElement('div'); sp.className = 'bar-spacer'; track.appendChild(sp); }
             const seg = document.createElement('div');
-            seg.className = 'bar-segment';
-            seg.style.cssText = `width:${missingN / N * 100}%;background:repeating-linear-gradient(135deg,var(--blue-fill) 0px,var(--blue-fill) 2px,transparent 2px,transparent 5px);border:1px dashed var(--border-miss);`;
+            seg.className = 'bar-segment absent-seg';
+            seg.style.width = `${missingN / N * 100}%`;
             track.appendChild(seg);
           }
         }
@@ -1286,7 +1296,7 @@ const RECORDS = [
     const dimsToShow = activeTab === 'all' ? DIMENSIONS : [activeTab];
 
     for (const dim of dimsToShow) {
-      const attrsInDim = ATTRIBUTES[dim] || [];
+      const attrsInDim = (ATTRIBUTES[dim] || []).filter(k => state.attrs.size === 0 || state.attrs.has(k));
       if (attrsInDim.length === 0) continue;
 
       const grp = document.createElement('div');
@@ -1405,6 +1415,8 @@ const RECORDS = [
     renderFilterSummary();
     renderBarChart();
     renderRecordList();
+    const rec = RECORDS.find(r => r.id === state.selectedRecord);
+    if (rec) renderFieldCards(rec);
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
