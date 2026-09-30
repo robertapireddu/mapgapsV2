@@ -1,65 +1,47 @@
 # MapGaps Version 3
 
-MapGaps maps how incomplete Europeana collection metadata is. **Version 3 starts from seven core
-attributes.** It shows how complete each one is across the collection (the yellow encoding:
-complete / incomplete / missing). You then choose which gaps to look at, such as temporal gaps or
-inconsistent gaps, and the selection leads down to the fields of individual records.
+MapGaps shows where heritage-collection metadata from [Europeana](https://www.europeana.eu) is
+uncertain or absent.
 
-| Attribute | Field | Why it matters |
-| --- | --- | --- |
-| Title | `dcTitle` | Baseline identification of the object |
-| Description | `dcDescription` | The main descriptive content; vague or non-descriptive text matters most here |
-| Subject | `dcSubject` | What the object is about |
-| Creator | `dcCreator` | Who made it |
-| Created / year | `dctermsCreated`, else Europeana `year` | When it was made (intrinsic, temporal) |
-| Country | `edmCountry` | Place of origin (intrinsic, spatial) |
-| Type | `dcType` | Genre or category; gives interpretive context |
+## The dashboard (`index.html`)
 
-The flags follow the **uncertainty-flagging taxonomy** (`uncertainty_flagging_taxonomy_v8.xlsx`).
-Each flag names the rule that raised it, for example `INT - TEMP - INCOMP`. That code gives:
+Version 3 is a single self-contained page. It has no build step and no dependencies: open
+`index.html` in a browser, or run `npm start` and go to <http://localhost:8000>.
 
-- the **issue type**: missing, incomplete, inconsistent or contested
-- the **dimension**: temporal, spatial, linguistic or attributional
-- the **origin**: intrinsic/epistemic, extrinsic/user input, or extrinsic/data conversion
-- the **scope**: record or collection
+It works on an embedded sample of 10 records (*Romani & Traveller Communities in Britain*) and
+seven attributes:
 
-## Running it
+| Dimension | Attributes |
+| --- | --- |
+| Temporal | `dctermsCreated` (Date Created) |
+| Spatial | `edmCountry` (Country) |
+| Textual | `dcTitle`, `dcDescription`, `dcSubject` |
+| Attributional | `dcCreator`, `dcType` |
 
-It is a static page with no build step and no dependencies. Open `index.html`, or run
-`npm start` and go to <http://localhost:8000>.
+- **Filters**: multi-select Dimension, Attribute and Issue type (incomplete, inconsistent,
+  contested, absent), plus a search box.
+- **Bar chart**: one bar per attribute.
+  - With no issue filter, it shows the % of records with any flag, split into uncertain and absent.
+  - With an issue filter, the bar is stacked by issue type.
+  - Clicking a bar highlights it.
+- **Record list**: the records that match the filters, most flagged first, with issue pills.
+- **Field cards**: the selected record's fields, grouped by dimension. A field that belongs to a
+  term cluster opens a pop-up listing the term variants and the records that share them.
 
-## How the dashboard works
+The sample records, flags and term clusters are written by hand in the `RECORDS` and
+`TERM_CLUSTERS` constants at the top of the page.
 
-1. **Filters** (top):
-   - *Dimension*: all, temporal, spatial, linguistic, attributional
-   - *Gap type*: all gaps, missing, incomplete, inconsistent, contested
-   - *Origin*: epistemic, user input, data conversion, empty field
+## Taxonomy engine (not yet connected to the page)
 
-   A sentence under the filters says what is in view.
-2. **Incompleteness by attribute**: one card per attribute. Each card shows its completeness bar
-   (complete / incomplete / missing), how many records have inconsistent or contested values, and,
-   for titles and descriptions, how many are vague. Cards whose attribute is checked for the chosen
-   dimension get a green frame. Click a card to focus the map on that attribute.
-3. **Incompleteness map**: records × attributes.
-   - With *All gaps*, each cell shows the completeness state. A pink corner marks an inconsistent
-     value; a blue dot marks a contested one.
-   - With a single gap type, cells are filled only where that type occurs.
-   - Rows are sorted by how many attributes have gaps in view, then by the record's
-     **incompleteness level**: missing attributes count 1, incomplete ones ½, out of 7.
-   - Hover over a cell for the reasons behind it. Click it to open the record.
-4. **Selected record**: the seven attribute values. Flagged words are highlighted, the reasons
-   carry their taxonomy codes, and the Europeana-proxy value is shown when full records are loaded.
-   Click a ▲ term to open **Records with similar terms**, which lists every record using any form
-   of the term (Gypsy / Gipsy / Romani / Roma …). Other record fields (dcDate, dcCoverage, …) sit
-   under *Other fields in the record*.
+`js/analysis.js`, `js/io.js` and `data/` hold the engine built for earlier versions. It can:
 
-### Vague / non-descriptive titles and descriptions
+- read Europeana data (Search API items, Record API objects with the provider and Europeana
+  proxies, or CSV/JSON files)
+- flag it with the rules of the uncertainty-flagging taxonomy
+- find term clusters automatically (Gypsy / Gipsy / Romani / Roma, …)
 
-These are flagged under `EXT - UI - LING - INCOM` and marked *Vague / non-descriptive*:
-
-- placeholder text (`Untitled`, `Photograph`, `No description available`, …)
-- a description that only repeats the title
-- a description of fewer than five words
+`npm test` runs its tests. Hooking it up would let the Version 3 page run on real collections
+instead of the embedded sample.
 
 ## How the taxonomy is applied
 
@@ -126,17 +108,15 @@ A new rule code in the spreadsheet also needs detection logic in `js/analysis.js
 - countries
 - places whose country is known
 
-## Loading data
+## Data the engine reads
 
-Open the data menu (top right). You can load data in three ways:
-
-- **Europeana API**: enter your API key ([free](https://pro.europeana.eu/page/get-api)) and a query.
-  - With *Full records* ticked (the default), each result is fetched from the Record API, so both proxies can be compared.
-  - Untick it for a faster, search-only load, which skips the proxy comparisons.
-- **File**:
-  - a CSV with Europeana or Dublin Core headers (`dcTitle` or `dc:title`, `dcDate`, `dctermsCreated`, `dcCoverage` / `dcterms:spatial`, `dctermsProvenance`, `edmCountry`, `dcSubject`, `dcType`, `dcDescription`, `dcCreator`, `dcContributor`, `dcIdentifier`). Prefix a column with `europeana:` to give Europeana-proxy values.
+- **Europeana API**: `MapGapsIO.fetchEuropeana({ apiKey, query, max, full })` in `js/io.js`.
+  - `full: true` also fetches each record from the Record API, so the provider and Europeana proxies can be compared.
+  - Get an API key [free](https://pro.europeana.eu/page/get-api).
+- **Files**:
+  - a CSV with Europeana or Dublin Core headers (`dcTitle` or `dc:title`, `dcDate`, `dctermsCreated` or `year`, `dcCoverage` / `dcterms:spatial`, `dctermsProvenance`, `edmCountry`, `dcSubject`, `dcType`, `dcDescription`, `dcCreator`, `dcContributor`, `dcIdentifier`). Prefix a column with `europeana:` to give Europeana-proxy values.
   - a saved Search API response (`items`) or Record API response (`object`).
-- **Sample collection**: 72 **synthetic** records shaped like Record API responses. They describe no real objects. Regenerate them with `npm run sample`.
+- **Synthetic test collection**: `data/sample-data.js`, 72 invented records shaped like Record API responses. Regenerate it with `npm run sample`.
 
 ## Development
 
@@ -149,8 +129,7 @@ npm run sample    # regenerate data/sample-data.js
 | --- | --- |
 | `js/analysis.js` | Taxonomy engine; runs in the browser and in Node |
 | `js/io.js` | CSV/JSON parsing; Europeana Search and Record API client |
-| `js/app.js` | User interface |
-| `css/style.css` | Styles, with light and dark themes |
+| `index.html` | The Version 3 dashboard (self-contained) |
 | `data/taxonomy.js` | Generated from the taxonomy spreadsheet |
 | `data/vocabulary.js` | Collection word lists |
 | `data/sample-data.js` | Synthetic sample collection |

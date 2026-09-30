@@ -1,128 +1,1417 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>MapGapsVersion3</title>
-  <meta name="description" content="Map the incompleteness of seven core Europeana attributes, then filter by gap dimension and type down to the record fields.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap">
-  <link rel="stylesheet" href="css/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>[hidden]{display:none!important}</style><!-- same rule the artifact host adds -->
+<title>MapGapsVersion3</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+
+<style>
+/* ─── Design tokens ───────────────────────────────────────────────────────────
+   Layout: topbar → filter panel → bar chart → record list + field cards
+   Palette: single grey-blue family; colour for issue-type bars + nature tags
+   Type: Inter UI · DM Mono for IDs and field keys
+──────────────────────────────────────────────────────────────────────────────── */
+:root {
+  --bg:          #F5F6F8;
+  --bg-panel:    #FFFFFF;
+  --bg-panel-2:  #F0F2F5;
+  --bg-hover:    #EDF0F5;
+
+  --border:      #DDE1E8;
+  --border-mid:  #C8CEDB;
+  --border-card: #7A95B8;
+  --border-miss: #A8B8D0;
+
+  --fg:          #141820;
+  --fg-2:        #4A5568;
+  --fg-3:        #8896A8;
+  --fg-mono:     #3A4A5C;
+
+  --blue-solid:  #7A95B8;
+  --blue-stripe: #A8B8D0;
+  --blue-fill:   #DDE3ED;
+  --blue-sel:    #4A6A90;
+  --blue-deep:   #2A4A6A;
+
+  /* Issue-type colour system */
+  --c-incomplete-bg:   #EEEDFE; --c-incomplete-fg:   #3C3489; --c-incomplete-bar:  #8880CC;
+  --c-inconsistent-bg: #E1F5EE; --c-inconsistent-fg: #085041; --c-inconsistent-bar:#3AA880;
+  --c-contested-bg:    #FCEBEB; --c-contested-fg:    #A32D2D; --c-contested-bar:   #D96060;
+  --c-missing-bg:      #DDE3ED; --c-missing-fg:      #3C5070; --c-missing-bar:     #7A95B8;
+
+  /* Dimension colours — used for bar segmentation when dim filter active */
+  --dim-temporal-bar:      #9B7FD4;
+  --dim-spatial-bar:       #4A9E82;
+  --dim-textual-bar:       #5A8FC8;
+  --dim-attributional-bar: #D4884A;
+
+  --tag-incomplete-bg:    #EEEDFE; --tag-incomplete-fg:    #3C3489;
+  --tag-inconsistent-bg:  #E1F5EE; --tag-inconsistent-fg:  #085041;
+  --tag-contested-bg:     #FCEBEB; --tag-contested-fg:     #A32D2D;
+  --tag-missing-bg:       #DDE3ED; --tag-missing-fg:       #3C5070;
+
+  --term-inconsistent-border: #FAC775; --term-inconsistent-fg: #633806;
+  --term-contested-border:    #F09595; --term-contested-fg:    #A32D2D;
+
+  --chip-bg:      #EDF0F5;
+  --chip-active:  #2A4A6A;
+  --chip-active-t:#FFFFFF;
+
+  --filter-active-dim:  #1A3A5C;
+  --filter-active-issue-incomplete:  #3C3489;
+  --filter-active-issue-inconsistent:#085041;
+  --filter-active-issue-contested:   #A32D2D;
+  --filter-active-issue-missing:     #3C5070;
+
+  --modal-overlay: rgba(20,24,32,0.45);
+
+  --r-sm: 4px; --r: 8px; --r-lg: 12px; --r-xl: 20px;
+  --font-ui:   'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'DM Mono', 'Courier New', monospace;
+  --t: 120ms ease;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111520; --bg-panel: #1A1F2E; --bg-panel-2: #141828; --bg-hover: #202538;
+    --border: #2A3048; --border-mid: #3A4460;
+    --fg: #E8ECF4; --fg-2: #A0AABB; --fg-3: #60708A; --fg-mono: #8AAAC8;
+    --blue-solid: #6A85A8; --blue-stripe: #4A6A90; --blue-fill: #1E2A3A;
+    --blue-sel: #4A6A90; --blue-deep: #A8C4E0;
+    --chip-bg: #202538; --chip-active: #4A6A90;
+    --c-incomplete-bar: #7068C0; --c-inconsistent-bar: #2A9870; --c-contested-bar: #C05050; --c-missing-bar: #5A7898;
+    --dim-temporal-bar: #8068C8; --dim-spatial-bar: #3A8E72; --dim-textual-bar: #4A7FB8; --dim-attributional-bar: #C47840;
+    --tag-incomplete-bg: #1E1A40; --tag-incomplete-fg: #A090F0;
+    --tag-inconsistent-bg: #0E2820; --tag-inconsistent-fg: #50C090;
+    --tag-contested-bg: #3A1010; --tag-contested-fg: #F07070;
+    --tag-missing-bg: #1E2A3A; --tag-missing-fg: #7090B0;
+    --modal-overlay: rgba(0,0,0,0.65);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111520; --bg-panel: #1A1F2E; --bg-panel-2: #141828; --bg-hover: #202538;
+  --border: #2A3048; --border-mid: #3A4460;
+  --fg: #E8ECF4; --fg-2: #A0AABB; --fg-3: #60708A; --fg-mono: #8AAAC8;
+  --blue-solid: #6A85A8; --blue-stripe: #4A6A90; --blue-fill: #1E2A3A;
+  --blue-sel: #4A6A90; --blue-deep: #A8C4E0;
+  --chip-bg: #202538; --chip-active: #4A6A90;
+  --c-incomplete-bar: #7068C0; --c-inconsistent-bar: #2A9870; --c-contested-bar: #C05050; --c-missing-bar: #5A7898;
+  --dim-temporal-bar: #8068C8; --dim-spatial-bar: #3A8E72; --dim-textual-bar: #4A7FB8; --dim-attributional-bar: #C47840;
+  --tag-incomplete-bg: #1E1A40; --tag-incomplete-fg: #A090F0;
+  --tag-inconsistent-bg: #0E2820; --tag-inconsistent-fg: #50C090;
+  --tag-contested-bg: #3A1010; --tag-contested-fg: #F07070;
+  --tag-missing-bg: #1E2A3A; --tag-missing-fg: #7090B0;
+  --modal-overlay: rgba(0,0,0,0.65);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: var(--font-ui); font-size: 13px; line-height: 1.5;
+  background: var(--bg); color: var(--fg);
+  overflow: hidden; padding: 0 0 env(safe-area-inset-bottom,0px);
+}
+button { font-family: inherit; cursor: pointer; }
+input  { font-family: inherit; }
+
+/* ── App shell ───────────────────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+
+/* Topbar */
+#topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 18px; height: 44px;
+  background: var(--bg-panel); border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0; z-index: 10;
+}
+#topbar-logo {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  letter-spacing: 0.07em; color: var(--blue-deep); text-transform: uppercase; flex-shrink: 0;
+}
+#topbar-collection { font-size: 11px; color: var(--fg-3); border-left: 0.5px solid var(--border-mid); padding-left: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#topbar-spacer { flex: 1; }
+#topbar-search {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--bg-panel-2); border: 0.5px solid var(--border); border-radius: var(--r);
+  padding: 0 9px; height: 28px; min-width: 180px;
+}
+#topbar-search input { border: none; background: transparent; color: var(--fg); font-size: 11px; outline: none; width: 100%; }
+#topbar-search input::placeholder { color: var(--fg-3); }
+
+/* ── Main body ───────────────────────────────────────────────────────────── */
+#body { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
+
+/* ── Filter panel ────────────────────────────────────────────────────────── */
+#filter-panel {
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 18px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.filter-label-inline {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--fg-3);
+  flex-shrink: 0; white-space: nowrap;
+}
+/* Multi-select dropdown */
+.fdd-wrap {
+  position: relative; flex-shrink: 0;
+}
+.fdd-trigger {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 9px 4px 10px; border-radius: var(--r);
+  border: 0.5px solid var(--border-mid); background: var(--chip-bg);
+  color: var(--fg-2); font-size: 11px; font-weight: 500;
+  cursor: pointer; user-select: none; white-space: nowrap;
+  transition: background var(--t), border-color var(--t), color var(--t);
+  font-family: var(--font-ui);
+  min-width: 100px;
+}
+.fdd-trigger:hover { background: var(--bg-hover); }
+.fdd-trigger.has-value {
+  background: var(--blue-fill); border-color: var(--blue-sel); color: var(--blue-deep);
+}
+.fdd-trigger.has-value .fdd-caret { color: var(--blue-sel); }
+.fdd-label { flex: 1; }
+.fdd-count {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  background: var(--blue-sel); color: #fff;
+  border-radius: 8px; padding: 0 5px; min-width: 16px; text-align: center;
+  display: none;
+}
+.fdd-trigger.has-value .fdd-count { display: block; }
+.fdd-caret {
+  color: var(--fg-3); transition: transform var(--t);
+  flex-shrink: 0; font-size: 9px; line-height: 1;
+}
+.fdd-wrap.open .fdd-caret { transform: rotate(180deg); }
+
+.fdd-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 100;
+  background: var(--bg-panel); border: 0.5px solid var(--border-mid);
+  border-radius: var(--r); box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  min-width: 170px; overflow: hidden; display: none;
+}
+.fdd-wrap.open .fdd-menu { display: block; }
+.fdd-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 11px; cursor: pointer; font-size: 11px;
+  color: var(--fg-2); transition: background var(--t);
+  user-select: none;
+}
+.fdd-item:hover { background: var(--bg-hover); }
+.fdd-item.selected { color: var(--fg); }
+.fdd-check {
+  width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+  border: 1.5px solid var(--border-mid); background: var(--bg-panel-2);
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--t), border-color var(--t);
+}
+.fdd-item.selected .fdd-check {
+  background: var(--blue-sel); border-color: var(--blue-sel);
+}
+.fdd-item.selected .fdd-check::after {
+  content: ''; display: block; width: 7px; height: 5px;
+  border-left: 1.5px solid #fff; border-bottom: 1.5px solid #fff;
+  transform: rotate(-45deg) translateY(-1px);
+}
+/* Dimension items get their own colour dot */
+.fdd-dim-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; opacity: 0.8;
+}
+/* Issue type items */
+.fdd-issue-dot {
+  width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0;
+}
+.fdd-menu-footer {
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 5px 11px 7px; border-top: 0.5px solid var(--border);
+}
+.fdd-clear {
+  font-size: 10px; color: var(--fg-3); background: none; border: none;
+  padding: 0; cursor: pointer; text-decoration: underline; font-family: var(--font-ui);
+}
+.fdd-clear:hover { color: var(--fg); }
+
+#filter-reset {
+  font-size: 10px; color: var(--fg-3); background: none; border: none;
+  padding: 2px 6px; cursor: pointer; font-family: var(--font-ui);
+  text-decoration: underline; display: none;
+}
+#filter-reset.visible { display: block; }
+
+/* Active filter summary */
+#filter-summary {
+  font-size: 10px; color: var(--fg-3); padding: 5px 18px 6px;
+  background: var(--bg-panel);
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+  display: none;
+}
+#filter-summary.visible { display: block; }
+#filter-summary span { color: var(--blue-sel); font-weight: 500; }
+
+/* ── Chart section ───────────────────────────────────────────────────────── */
+#chart-section {
+  background: var(--bg-panel);
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+  padding: 12px 18px 10px;
+}
+#chart-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+#chart-title {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--fg-3);
+}
+#chart-legend { display: flex; gap: 12px; align-items: center; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--fg-3); }
+.legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.legend-swatch.uncertain { background: var(--blue-solid); }
+.legend-swatch.missing   { background: transparent; border: 1.5px dashed var(--border-miss); }
+
+#bar-chart { display: flex; flex-direction: column; gap: 7px; }
+.bar-row {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 3px 6px 3px 4px; border-radius: var(--r-sm);
+  border: 1.5px solid transparent;
+  transition: background var(--t), border-color var(--t);
+}
+.bar-row:hover { background: var(--bg-hover); }
+.bar-row.selected { background: var(--blue-fill); border-color: var(--blue-sel); }
+.bar-row-label {
+  width: 120px; flex-shrink: 0; text-align: right;
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+  gap: 1px; padding-right: 0;
+}
+.bar-row-label .lbl-name {
+  font-size: 11px; font-weight: 500; color: var(--fg-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 4px;
+}
+.bar-row-label .lbl-key {
+  font-family: var(--font-mono); font-size: 8.5px; color: var(--fg-3);
+  white-space: nowrap; letter-spacing: 0.02em;
+}
+.bar-track {
+  flex: 1; position: relative; height: 26px;
+  display: flex; align-items: center; gap: 0;
+}
+.bar-track::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%;
+  height: 0.5px; background: var(--border); pointer-events: none;
+}
+/* Stacked bar segments for issue-type mode */
+.bar-segment {
+  height: 10px; border-radius: 0; position: relative; z-index: 1; flex-shrink: 0;
+  transition: width var(--t);
+}
+.bar-segment:first-child { border-radius: 2px 0 0 2px; }
+.bar-segment:last-child  { border-radius: 0 2px 2px 0; }
+.bar-segment:only-child  { border-radius: 2px; }
+.bar-segment + .bar-segment { margin-left: 1px; }
+.bar-segment.incomplete   { background: var(--c-incomplete-bar); }
+.bar-segment.inconsistent { background: var(--c-inconsistent-bar); }
+.bar-segment.contested    { background: var(--c-contested-bar); }
+.bar-segment.missing-seg  { background: var(--c-missing-bar); opacity: 0.6; }
+/* Dimension segments */
+.bar-segment.dim-Temporal      { background: var(--dim-temporal-bar); }
+.bar-segment.dim-Spatial       { background: var(--dim-spatial-bar); }
+.bar-segment.dim-Textual       { background: var(--dim-textual-bar); }
+.bar-segment.dim-Attributional { background: var(--dim-attributional-bar); }
+/* Simple uncertain bar (no issue filter) */
+.bar-uncertain { height: 10px; border-radius: 2px; position: relative; z-index: 1; background: var(--blue-solid); flex-shrink: 0; }
+.bar-missing   {
+  height: 10px; border-radius: 2px; position: relative; z-index: 1; flex-shrink: 0;
+  background: repeating-linear-gradient(135deg, var(--blue-fill) 0px, var(--blue-fill) 2px, transparent 2px, transparent 5px);
+  border: 1px dashed var(--border-miss);
+}
+.bar-spacer { width: 3px; flex-shrink: 0; }
+.bar-counts {
+  display: flex; gap: 4px;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--fg-3); flex-shrink: 0; width: 60px;
+  font-variant-numeric: tabular-nums; text-align: right; justify-content: flex-end;
+}
+.bar-counts .n-u { color: var(--blue-sel); }
+.bar-counts .n-m { color: var(--tag-missing-fg); }
+
+/* Bar zero state */
+.bar-zero { font-size: 10px; color: var(--fg-3); padding: 12px 0 4px; text-align: center; }
+
+/* ── Bottom: record list + field cards ───────────────────────────────────── */
+#bottom { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+/* Left: record list */
+#left-panel {
+  width: 260px; flex-shrink: 0; display: flex; flex-direction: column;
+  border-right: 0.5px solid var(--border); background: var(--bg-panel); overflow: hidden;
+}
+#list-header {
+  padding: 8px 14px 7px; border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+}
+#list-context { font-size: 10px; color: var(--fg-3); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#list-count { font-family: var(--font-mono); font-size: 10px; color: var(--blue-sel); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+#record-list-wrap { flex: 1; overflow-y: auto; padding: 4px 0; }
+#record-list-empty { padding: 24px 14px; text-align: center; color: var(--fg-3); font-size: 11px; line-height: 1.6; }
+
+.record-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 14px; cursor: pointer;
+  border-left: 2.5px solid transparent;
+  transition: background var(--t), border-color var(--t);
+}
+.record-row:hover { background: var(--bg-hover); }
+.record-row.selected { background: var(--bg-hover); border-left-color: var(--blue-sel); }
+.record-thumb {
+  width: 26px; height: 26px; border-radius: 3px;
+  background: var(--bg-panel-2); border: 0.5px solid var(--border);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  color: var(--fg-3); margin-top: 1px;
+}
+.record-meta { flex: 1; min-width: 0; }
+.record-id    { font-family: var(--font-mono); font-size: 9px; color: var(--fg-3); display: block; }
+.record-title { font-size: 11px; font-weight: 500; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; margin-bottom: 3px; }
+.record-pills { display: flex; flex-wrap: wrap; gap: 2px; }
+.pill { font-size: 9px; padding: 1px 5px; border-radius: 8px; font-weight: 500; white-space: nowrap; }
+.pill.incomplete   { background: var(--tag-incomplete-bg);   color: var(--tag-incomplete-fg); }
+.pill.inconsistent { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); }
+.pill.contested    { background: var(--tag-contested-bg);    color: var(--tag-contested-fg); }
+.pill.missing      { background: var(--tag-missing-bg);      color: var(--tag-missing-fg); }
+
+/* Right: field cards */
+#right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+#detail-header {
+  padding: 11px 18px 9px; border-bottom: 0.5px solid var(--border);
+  background: var(--bg-panel); flex-shrink: 0;
+}
+#detail-title { font-size: 14px; font-weight: 600; color: var(--fg); margin: 0 0 1px; }
+#detail-sub   { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); margin-bottom: 7px; }
+#detail-dim-tabs { display: flex; gap: 3px; flex-wrap: wrap; }
+.dim-tab {
+  font-size: 10px; font-weight: 500; padding: 2px 9px;
+  border-radius: var(--r-xl); border: 0.5px solid var(--border-mid);
+  background: var(--chip-bg); color: var(--fg-2); cursor: pointer; transition: background var(--t);
+}
+.dim-tab:hover { background: var(--bg-hover); }
+.dim-tab.active { background: var(--chip-active); border-color: var(--chip-active); color: #fff; }
+#right-empty {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 8px; padding: 40px; text-align: center;
+}
+#right-empty svg { color: var(--fg-3); opacity: 0.3; }
+#right-empty p { color: var(--fg-3); font-size: 12px; line-height: 1.7; margin: 0; }
+#right-empty strong { display: block; color: var(--fg-2); font-size: 13px; margin-bottom: 3px; }
+#field-cards-wrap { flex: 1; overflow-y: auto; padding: 14px 18px; }
+.dim-group { margin-bottom: 18px; }
+.dim-group-heading {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--fg-3);
+  margin-bottom: 7px; padding-bottom: 5px; border-bottom: 0.5px solid var(--border);
+}
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; }
+.field-card {
+  border-radius: var(--r); padding: 9px 11px;
+  display: flex; flex-direction: column; gap: 3px;
+  position: relative; min-height: 72px;
+}
+.field-card.complete    { background: var(--bg-panel); border: 0.5px solid var(--border); }
+.field-card.flagged     { background: var(--bg-panel); border: 1.5px solid var(--border-card); }
+.field-card.missing     { background: var(--bg-panel); border: 1.5px dashed var(--border-miss); }
+.field-card.placeholder { background: transparent; border: 1.5px dashed var(--border); opacity: 0.3; order: 99; }
+.field-card-key   { font-family: var(--font-mono); font-size: 9px; color: var(--fg-3); letter-spacing: 0.03em; }
+.field-card-label { font-size: 11px; font-weight: 500; color: var(--fg-2); }
+.field-card-value { font-size: 11px; color: var(--fg); line-height: 1.4; word-break: break-word; }
+.field-card.missing .field-card-value { color: var(--fg-3); font-style: italic; }
+.card-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.nature-tag {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; padding: 1px 5px; border-radius: 3px;
+}
+.nature-tag.incomplete   { background: var(--tag-incomplete-bg);   color: var(--tag-incomplete-fg); }
+.nature-tag.inconsistent { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); }
+.nature-tag.contested    { background: var(--tag-contested-bg);    color: var(--tag-contested-fg); }
+.nature-tag.missing      { background: var(--tag-missing-bg);      color: var(--tag-missing-fg); }
+.contested-word {
+  background: var(--tag-contested-bg); color: var(--tag-contested-fg);
+  border-radius: 2px; padding: 0 2px; cursor: help;
+}
+.term-card {
+  border-radius: var(--r); padding: 9px 11px;
+  display: flex; flex-direction: column; gap: 3px; min-height: 72px;
+  cursor: pointer; transition: opacity var(--t);
+}
+.term-card:hover { opacity: 0.82; }
+.term-card.inconsistent { border: 1.5px solid var(--term-inconsistent-border); background: var(--bg-panel); }
+.term-card.contested    { border: 1.5px solid var(--term-contested-border);    background: var(--bg-panel); }
+.term-card-key   { font-family: var(--font-mono); font-size: 9px; color: var(--fg-3); }
+.term-card-label { font-size: 11px; font-weight: 500; }
+.term-card.inconsistent .term-card-label { color: var(--term-inconsistent-fg); }
+.term-card.contested    .term-card-label { color: var(--term-contested-fg); }
+.term-card-tags  { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 2px; }
+
+/* Modal */
+#modal-overlay {
+  position: fixed; inset: 0; background: var(--modal-overlay);
+  z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+#modal-overlay[hidden] { display: none !important; }
+#modal {
+  background: var(--bg-panel); border-radius: var(--r-lg);
+  width: 100%; max-width: 500px; max-height: 78vh;
+  display: flex; flex-direction: column;
+  border: 0.5px solid var(--border-mid);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18); overflow: hidden;
+}
+#modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 14px 16px 10px; border-bottom: 0.5px solid var(--border); flex-shrink: 0;
+}
+#modal-title { font-size: 13px; font-weight: 600; color: var(--fg); }
+#modal-sub   { font-size: 10px; color: var(--fg-3); margin-top: 2px; }
+#modal-close { background: none; border: none; padding: 2px; color: var(--fg-3); font-size: 17px; line-height: 1; cursor: pointer; }
+#modal-close:hover { color: var(--fg); }
+#modal-body { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+.modal-callout { border-radius: var(--r); padding: 9px 11px; font-size: 11px; line-height: 1.5; color: var(--fg-2); border-left: 3px solid; background: var(--bg-panel-2); }
+.modal-callout.inconsistent { border-color: var(--term-inconsistent-border); }
+.modal-callout.contested    { border-color: var(--term-contested-border); }
+.modal-section-label { font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 5px; }
+.term-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.term-chip { font-size: 10px; font-weight: 500; padding: 2px 9px; border-radius: var(--r-xl); }
+.term-chip.inconsistent { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); }
+.term-chip.contested    { background: var(--tag-contested-bg);    color: var(--tag-contested-fg); }
+.term-chip.incomplete   { background: var(--tag-incomplete-bg);   color: var(--tag-incomplete-fg); }
+.modal-record-list { display: flex; flex-direction: column; gap: 3px; }
+.modal-record-item {
+  display: flex; align-items: center; gap: 7px; padding: 5px 7px;
+  border-radius: var(--r-sm); background: var(--bg-panel-2); font-size: 11px;
+}
+.modal-record-item .rid    { font-family: var(--font-mono); font-size: 9px; color: var(--fg-3); flex-shrink: 0; }
+.modal-record-item .rtitle { color: var(--fg-2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.modal-record-item .rbadge { font-size: 9px; padding: 1px 5px; border-radius: 8px; font-weight: 600; flex-shrink: 0; }
+.rbadge.contested    { background: var(--tag-contested-bg);    color: var(--tag-contested-fg); }
+.rbadge.inconsistent { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); }
+#modal-footer {
+  display: flex; gap: 5px; padding: 10px 16px;
+  border-top: 0.5px solid var(--border); justify-content: flex-end; flex-shrink: 0; flex-wrap: wrap;
+}
+.modal-btn { font-size: 11px; font-weight: 500; padding: 5px 12px; border-radius: var(--r); border: none; cursor: pointer; transition: opacity var(--t); }
+.modal-btn:hover { opacity: 0.85; }
+.modal-btn.neutral { background: var(--bg-panel-2); color: var(--fg-2); border: 0.5px solid var(--border-mid); }
+.modal-btn.slate   { background: #4A6A90; color: #fff; }
+.modal-btn.danger  { background: #A32D2D; color: #fff; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 3px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0ms !important; } }
+
+@media (max-width: 700px) {
+  #left-panel { width: 220px; }
+  .bar-row-label { width: 80px; }
+  .filter-label { width: 60px; }
+}
+@media (max-width: 520px) {
+  #bottom { flex-direction: column; }
+  #left-panel { width: 100%; height: 200px; border-right: none; border-bottom: 0.5px solid var(--border); }
+}
+</style>
 </head>
 <body>
-  <header class="masthead">
-    <div class="brand">
-      <h1>MapGaps <span>Version 3</span></h1>
-      <p>Incompleteness in Europeana collection metadata, attribute by attribute</p>
-    </div>
 
-    <details class="source" id="source">
-      <summary><span id="source-label">Sample collection</span> · <span id="record-count">0</span> records</summary>
-      <div class="source-panel">
-        <section>
-          <h2>Europeana API</h2>
-          <form id="europeana-form">
-            <label for="api-key">API key</label>
-            <input id="api-key" name="apiKey" required autocomplete="off" placeholder="your wskey">
-            <label for="query">Query</label>
-            <input id="query" name="query" placeholder='e.g. roma OR DATA_PROVIDER:"…"'>
-            <label for="max">Max records</label>
-            <input id="max" name="max" type="number" min="1" max="1000" value="200">
-            <label class="check" for="full"><input type="checkbox" id="full" name="full" checked> Full records: compare provider and Europeana proxies (slower)</label>
-            <button type="submit">Fetch records</button>
-            <p class="hint">Free key at <a href="https://pro.europeana.eu/page/get-api" target="_blank" rel="noopener">pro.europeana.eu</a>.</p>
-          </form>
-        </section>
-        <section>
-          <h2>File</h2>
-          <label class="file" for="file-input">CSV or JSON</label>
-          <input type="file" id="file-input" accept=".csv,.json,text/csv,application/json">
-          <p class="hint">CSV with <code>dcTitle</code>, <code>dcDescription</code>, <code>dcSubject</code>, <code>dcCreator</code>, <code>dctermsCreated</code> or <code>year</code>, <code>edmCountry</code>, <code>dcType</code> columns, or a saved Europeana Search / Record API response.</p>
-        </section>
-        <section>
-          <button type="button" id="use-sample" class="ghost">Back to the sample collection</button>
-          <p class="hint">The sample records are synthetic.</p>
-        </section>
-        <p class="status" id="source-status" role="status"></p>
-      </div>
-    </details>
-  </header>
+<!-- ─── DATA ──────────────────────────────────────────────────────────────── -->
+<script>
+const DIMENSIONS = ['Temporal','Spatial','Textual','Attributional'];
+const ISSUE_TYPES = ['incomplete','inconsistent','contested','missing'];
 
-  <section class="filters" aria-label="Choose which gaps to see">
-    <div class="filter">
-      <span class="filter-label" id="dimension-label">Dimension</span>
-      <div class="seg" role="radiogroup" aria-labelledby="dimension-label" id="dimension-filter"></div>
-    </div>
-    <div class="filter">
-      <span class="filter-label" id="type-label">Gap type</span>
-      <div class="seg" role="radiogroup" aria-labelledby="type-label" id="type-filter"></div>
-    </div>
-    <div class="filter">
-      <span class="filter-label" id="origin-label">Origin</span>
-      <div class="chips" role="group" aria-labelledby="origin-label" id="origin-filter"></div>
-    </div>
-    <p class="filter-summary" id="filter-summary" aria-live="polite"></p>
-  </section>
+const ATTRIBUTES = {
+  Temporal:      ['dctermsCreated'],
+  Spatial:       ['edmCountry'],
+  Textual:       ['dcTitle','dcDescription','dcSubject'],
+  Attributional: ['dcCreator','dcType'],
+};
+const ALL_ATTRS = ['dcTitle','dcDescription','dcSubject','dcCreator','dctermsCreated','edmCountry','dcType'];
+const ATTR_LABELS = {
+  dcTitle:'Title', dcDescription:'Description', dcSubject:'Subject',
+  dcCreator:'Creator', dctermsCreated:'Date Created', edmCountry:'Country', dcType:'Type / Genre',
+};
+const ATTR_DIM = {};
+for (const [dim,attrs] of Object.entries(ATTRIBUTES)) for (const a of attrs) ATTR_DIM[a] = dim;
 
-  <section class="attributes" aria-labelledby="attributes-title">
-    <div class="section-head">
-      <h2 id="attributes-title">Incompleteness by attribute</h2>
-      <ul class="legend" aria-label="Legend">
-        <li><i class="sw s-complete"></i>Complete</li>
-        <li><i class="sw s-incomplete"></i>Incomplete</li>
-        <li><i class="sw s-missing"></i>Missing</li>
-        <li><i class="mk mk-inconsistent"></i>Inconsistent</li>
-        <li><i class="mk mk-contested"></i>Contested</li>
-      </ul>
-    </div>
-    <div class="attr-grid" id="attributes"></div>
-  </section>
+const DIM_COLOURS = {
+  Temporal:'var(--dim-temporal-bar)', Spatial:'var(--dim-spatial-bar)',
+  Textual:'var(--dim-textual-bar)',  Attributional:'var(--dim-attributional-bar)',
+};
 
-  <main class="workbench">
-    <section class="map" aria-labelledby="map-title">
-      <div class="section-head">
-        <div>
-          <h2 id="map-title">Incompleteness map</h2>
-          <p class="sub" id="map-sub"></p>
+const TERM_CLUSTERS = {
+  'gypsy-terminology': { name:'Romani / Gypsy terminology', terms:[{value:'Gypsy',type:'contested'},{value:'Romani',type:'inconsistent'},{value:'Roma',type:'inconsistent'},{value:'Traveller',type:'inconsistent'}], records:[1274,1275,1277,1281] },
+  'uk-coverage': { name:'UK / England coverage terms', terms:[{value:'United Kingdom',type:'inconsistent'},{value:'UK',type:'inconsistent'},{value:'England',type:'inconsistent'},{value:'Britain',type:'inconsistent'}], records:[1274,1276,1278] },
+  'photographic-type': { name:'Photographic / image type terms', terms:[{value:'photograph',type:'inconsistent'},{value:'image',type:'inconsistent'},{value:'still image',type:'inconsistent'}], records:[1274,1276,1277,1279,1280] },
+  'century-contested': { name:'Century vs. decade dating', terms:[{value:'20th century',type:'incomplete'},{value:'1960s',type:'incomplete'},{value:'c. 1965',type:'incomplete'},{value:'1960–1970',type:'incomplete'}], records:[1274,1275,1277,1282] },
+};
+
+const RECORDS = [
+  { id:1274, title:'Roma Caravan', thumbnail:null, fields:{
+    dcTitle:        {value:'Roma Caravan', flags:[{type:'inconsistent',dim:'Textual',note:'Title differs from record 1281 ("Gypsy Caravan") for same object.'}]},
+    dcDescription:  {value:'<span class="contested-word" title="\'Romani\' used inconsistently">Romani</span> family photographed outside their caravan in rural Yorkshire.', flags:[{type:'inconsistent',dim:'Textual'}], termCluster:'gypsy-terminology'},
+    dcSubject:      {missing:true, flags:[{type:'missing',dim:'Textual'}]},
+    dcCreator:      {value:'www.wikidata.org', flags:[{type:'incomplete',dim:'Attributional',note:'Creator resolved to a generic Wikidata URI.'}]},
+    dctermsCreated: {value:'20th Century', flags:[{type:'incomplete',dim:'Temporal',note:'Date only granular to century.'}], termCluster:'century-contested'},
+    edmCountry:     {value:'United Kingdom', flags:[{type:'inconsistent',dim:'Spatial',note:'"United Kingdom", "UK", and "England" coexist across comparable records.'}], termCluster:'uk-coverage'},
+    dcType:         {value:'image', flags:[{type:'inconsistent',dim:'Attributional',note:'"image", "photograph" and "still image" coexist.'}], termCluster:'photographic-type'},
+  }},
+  { id:1275, title:'Traveller Children at Play', thumbnail:null, fields:{
+    dcTitle:        {value:'Traveller Children at Play', flags:[]},
+    dcDescription:  {value:'<span class="contested-word" title="\'Gypsy\' is a contested term">Gypsy</span> children playing near a site in County Durham.', flags:[{type:'contested',dim:'Textual'}], termCluster:'gypsy-terminology'},
+    dcSubject:      {value:'Children; Play; Romani culture', flags:[{type:'incomplete',dim:'Textual',note:'Subject terms lack controlled vocabulary authority.'}]},
+    dcCreator:      {missing:true, flags:[{type:'missing',dim:'Attributional'}]},
+    dctermsCreated: {value:'1960s', flags:[{type:'incomplete',dim:'Temporal',note:'Decade-level dating only.'}], termCluster:'century-contested'},
+    edmCountry:     {value:'England', flags:[{type:'inconsistent',dim:'Spatial'}], termCluster:'uk-coverage'},
+    dcType:         {value:'photograph', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
+  }},
+  { id:1276, title:'Campfire Scene, Yorkshire Moors', thumbnail:null, fields:{
+    dcTitle:        {value:'Campfire Scene, Yorkshire Moors', flags:[]},
+    dcDescription:  {value:'A family gathered around a campfire on open moorland. Location unconfirmed.', flags:[{type:'incomplete',dim:'Textual',note:'Location described as "unconfirmed".'}]},
+    dcSubject:      {value:'Family life; Outdoor life; Campfires', flags:[]},
+    dcCreator:      {value:'Bert Hardy', flags:[]},
+    dctermsCreated: {value:'1967', flags:[]},
+    edmCountry:     {value:'UK', flags:[{type:'inconsistent',dim:'Spatial'}], termCluster:'uk-coverage'},
+    dcType:         {value:'still image', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
+  }},
+  { id:1277, title:'Horse Fair, Appleby', thumbnail:null, fields:{
+    dcTitle:        {value:'Horse Fair, Appleby', flags:[]},
+    dcDescription:  {value:'<span class="contested-word" title="Contested">Gypsies</span> and <span class="contested-word" title="Contested">Travellers</span> at Appleby New Fair.', flags:[{type:'contested',dim:'Textual'}], termCluster:'gypsy-terminology'},
+    dcSubject:      {value:'Horse fairs; Romani culture; Appleby', flags:[]},
+    dcCreator:      {missing:true, flags:[{type:'missing',dim:'Attributional'}]},
+    dctermsCreated: {value:'c. 1965', flags:[{type:'incomplete',dim:'Temporal',note:'"circa" indicates approximate date.'}], termCluster:'century-contested'},
+    edmCountry:     {value:'England', flags:[{type:'inconsistent',dim:'Spatial'}], termCluster:'uk-coverage'},
+    dcType:         {value:'photograph', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
+  }},
+  { id:1278, title:'Portrait of an Elder', thumbnail:null, fields:{
+    dcTitle:        {value:'Portrait of an Elder', flags:[{type:'incomplete',dim:'Textual',note:'Subject identity unrecorded.'}]},
+    dcDescription:  {value:'Close-up portrait of an elderly man, believed to be of Romani descent.', flags:[{type:'incomplete',dim:'Textual',note:'Relies on uncertain inference.'}]},
+    dcSubject:      {missing:true, flags:[{type:'missing',dim:'Textual'}]},
+    dcCreator:      {missing:true, flags:[{type:'missing',dim:'Attributional'}]},
+    dctermsCreated: {missing:true, flags:[{type:'missing',dim:'Temporal'}]},
+    edmCountry:     {value:'United Kingdom', flags:[]},
+    dcType:         {value:'image', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
+  }},
+  { id:1279, title:'Vardo by Roadside', thumbnail:null, fields:{
+    dcTitle:        {value:'Vardo by Roadside', flags:[]},
+    dcDescription:  {value:'Traditional painted wooden wagon (vardo) parked along a country road.', flags:[]},
+    dcSubject:      {value:'Vardos; Romani material culture; Caravans', flags:[]},
+    dcCreator:      {value:'Homer Sykes', flags:[]},
+    dctermsCreated: {value:'1972', flags:[]},
+    edmCountry:     {value:'England', flags:[{type:'inconsistent',dim:'Spatial'}], termCluster:'uk-coverage'},
+    dcType:         {value:'photograph', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
+  }},
+  { id:1280, title:'Roadside Camp, Kent', thumbnail:null, fields:{
+    dcTitle:        {value:'Roadside Camp, Kent', flags:[]},
+    dcDescription:  {value:'Informal roadside encampment with several vehicles and caravans. Kent, 1968.', flags:[]},
+    dcSubject:      {value:'Encampments; Rural life; Mobile communities', flags:[]},
+    dcCreator:      {value:'Tom Picton', flags:[]},
+    dctermsCreated: {value:'1968', flags:[]},
+    edmCountry:     {value:'England', flags:[]},
+    dcType:         {value:'still image', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
+  }},
+  { id:1281, title:'Gypsy Caravan', thumbnail:null, fields:{
+    dcTitle:        {value:'<span class="contested-word" title="\'Gypsy\' is contested">Gypsy</span> Caravan', flags:[{type:'contested',dim:'Textual'}], termCluster:'gypsy-terminology'},
+    dcDescription:  {value:'A painted wooden caravan parked in a field. Same object as record 1274.', flags:[{type:'inconsistent',dim:'Textual',note:'Duplicate of record 1274 with different title terminology.'}]},
+    dcSubject:      {value:'Caravans; Romani culture', flags:[]},
+    dcCreator:      {value:'www.wikidata.org', flags:[{type:'incomplete',dim:'Attributional',note:'Generic Wikidata URI.'}]},
+    dctermsCreated: {value:'20th Century', flags:[{type:'incomplete',dim:'Temporal'}], termCluster:'century-contested'},
+    edmCountry:     {value:'England', flags:[{type:'inconsistent',dim:'Spatial'}], termCluster:'uk-coverage'},
+    dcType:         {value:'image', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
+  }},
+  { id:1282, title:'Winter Camp, Dartmoor', thumbnail:null, fields:{
+    dcTitle:        {value:'Winter Camp, Dartmoor', flags:[]},
+    dcDescription:  {value:'Encampment on Dartmoor in winter conditions. No information on the community present.', flags:[{type:'incomplete',dim:'Textual',note:'Description lacks cultural context.'}]},
+    dcSubject:      {missing:true, flags:[{type:'missing',dim:'Textual'}]},
+    dcCreator:      {value:'Unknown', flags:[{type:'incomplete',dim:'Attributional',note:'"Unknown" effectively missing.'}]},
+    dctermsCreated: {value:'1960–1970', flags:[{type:'incomplete',dim:'Temporal',note:'Decade range only.'}], termCluster:'century-contested'},
+    edmCountry:     {value:'England', flags:[]},
+    dcType:         {value:'photograph', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
+  }},
+  { id:1283, title:'Smithy at Roadside', thumbnail:null, fields:{
+    dcTitle:        {value:'Smithy at Roadside', flags:[]},
+    dcDescription:  {value:'A travelling smith working at a portable forge. Location: Lincolnshire.', flags:[]},
+    dcSubject:      {value:'Blacksmithing; Travelling trades; Rural crafts', flags:[]},
+    dcCreator:      {value:'Chris Steele-Perkins', flags:[]},
+    dctermsCreated: {value:'1974', flags:[]},
+    edmCountry:     {value:'England', flags:[]},
+    dcType:         {value:'photograph', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
+  }},
+];
+</script>
+
+<!-- ─── HTML ──────────────────────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- Topbar -->
+  <div id="topbar">
+    <div id="topbar-logo">MapGaps</div>
+    <div id="topbar-collection">Europeana · Romani &amp; Traveller Communities in Britain · 10 records</div>
+    <div id="topbar-spacer"></div>
+    <div id="topbar-search">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="4.5" cy="4.5" r="3"/><line x1="7" y1="7" x2="10" y2="10"/></svg>
+      <input id="search-input" type="text" placeholder="Search records…" autocomplete="off">
+    </div>
+  </div>
+
+  <div id="body">
+
+    <!-- Filter panel -->
+    <div id="filter-panel">
+      <div class="filter-label-inline">Filter by</div>
+
+      <!-- Dimension dropdown -->
+      <div class="fdd-wrap" id="fdd-dim">
+        <div class="fdd-trigger" id="fdd-dim-trigger">
+          <span class="fdd-label">Dimension</span>
+          <span class="fdd-count" id="fdd-dim-count">0</span>
+          <span class="fdd-caret">▾</span>
         </div>
-        <label class="check" for="only-gaps"><input type="checkbox" id="only-gaps" checked> Only records with gaps in view</label>
+        <div class="fdd-menu" id="fdd-dim-menu">
+          <div class="fdd-item" data-val="Temporal">
+            <div class="fdd-check"></div>
+            <span class="fdd-dim-dot" style="background:var(--dim-temporal-bar)"></span>
+            Temporal
+          </div>
+          <div class="fdd-item" data-val="Spatial">
+            <div class="fdd-check"></div>
+            <span class="fdd-dim-dot" style="background:var(--dim-spatial-bar)"></span>
+            Spatial
+          </div>
+          <div class="fdd-item" data-val="Textual">
+            <div class="fdd-check"></div>
+            <span class="fdd-dim-dot" style="background:var(--dim-textual-bar)"></span>
+            Textual
+          </div>
+          <div class="fdd-item" data-val="Attributional">
+            <div class="fdd-check"></div>
+            <span class="fdd-dim-dot" style="background:var(--dim-attributional-bar)"></span>
+            Attributional
+          </div>
+          <div class="fdd-menu-footer"><button class="fdd-clear" data-clr="dim">Clear</button></div>
+        </div>
       </div>
-      <div class="matrix-wrap">
-        <table class="matrix" id="matrix">
-          <thead></thead>
-          <tbody></tbody>
-        </table>
+
+      <!-- Attribute dropdown -->
+      <div class="fdd-wrap" id="fdd-attr">
+        <div class="fdd-trigger" id="fdd-attr-trigger">
+          <span class="fdd-label">Attribute</span>
+          <span class="fdd-count" id="fdd-attr-count">0</span>
+          <span class="fdd-caret">▾</span>
+        </div>
+        <div class="fdd-menu" id="fdd-attr-menu">
+          <div class="fdd-item" data-val="dcTitle"><div class="fdd-check"></div>Title <span style="font-family:var(--font-mono);font-size:9px;color:var(--fg-3);margin-left:4px">dcTitle</span></div>
+          <div class="fdd-item" data-val="dcDescription"><div class="fdd-check"></div>Description <span style="font-family:var(--font-mono);font-size:9px;color:var(--fg-3);margin-left:4px">dcDescription</span></div>
+          <div class="fdd-item" data-val="dcSubject"><div class="fdd-check"></div>Subject <span style="font-family:var(--font-mono);font-size:9px;color:var(--fg-3);margin-left:4px">dcSubject</span></div>
+          <div class="fdd-item" data-val="dcCreator"><div class="fdd-check"></div>Creator <span style="font-family:var(--font-mono);font-size:9px;color:var(--fg-3);margin-left:4px">dcCreator</span></div>
+          <div class="fdd-item" data-val="dctermsCreated"><div class="fdd-check"></div>Date Created <span style="font-family:var(--font-mono);font-size:9px;color:var(--fg-3);margin-left:4px">dctermsCreated</span></div>
+          <div class="fdd-item" data-val="edmCountry"><div class="fdd-check"></div>Country <span style="font-family:var(--font-mono);font-size:9px;color:var(--fg-3);margin-left:4px">edmCountry</span></div>
+          <div class="fdd-item" data-val="dcType"><div class="fdd-check"></div>Type / Genre <span style="font-family:var(--font-mono);font-size:9px;color:var(--fg-3);margin-left:4px">dcType</span></div>
+          <div class="fdd-menu-footer"><button class="fdd-clear" data-clr="attr">Clear</button></div>
+        </div>
       </div>
-      <details class="rules-panel">
-        <summary>Taxonomy rules in view</summary>
-        <ul class="rules" id="rules"></ul>
-      </details>
-    </section>
 
-    <aside class="record" id="record" aria-live="polite" aria-label="Selected record"></aside>
-  </main>
-
-  <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
-
-  <dialog id="similar" class="similar" aria-labelledby="similar-title">
-    <form method="dialog" class="similar-head">
-      <div>
-        <p class="eyebrow">Record list with similar terms</p>
-        <h2 id="similar-title"></h2>
+      <!-- Issue type dropdown -->
+      <div class="fdd-wrap" id="fdd-issue">
+        <div class="fdd-trigger" id="fdd-issue-trigger">
+          <span class="fdd-label">Issue type</span>
+          <span class="fdd-count" id="fdd-issue-count">0</span>
+          <span class="fdd-caret">▾</span>
+        </div>
+        <div class="fdd-menu" id="fdd-issue-menu">
+          <div class="fdd-item" data-val="incomplete">
+            <div class="fdd-check"></div>
+            <span class="fdd-issue-dot" style="background:var(--c-incomplete-bar)"></span>
+            Incomplete
+          </div>
+          <div class="fdd-item" data-val="inconsistent">
+            <div class="fdd-check"></div>
+            <span class="fdd-issue-dot" style="background:var(--c-inconsistent-bar)"></span>
+            Inconsistent
+          </div>
+          <div class="fdd-item" data-val="contested">
+            <div class="fdd-check"></div>
+            <span class="fdd-issue-dot" style="background:var(--c-contested-bar)"></span>
+            Contested
+          </div>
+          <div class="fdd-item" data-val="missing">
+            <div class="fdd-check"></div>
+            <span class="fdd-issue-dot" style="background:var(--c-missing-bar);opacity:.7"></span>
+            Absent
+          </div>
+          <div class="fdd-menu-footer"><button class="fdd-clear" data-clr="issue">Clear</button></div>
+        </div>
       </div>
-      <button class="close" aria-label="Close">×</button>
-    </form>
-    <p class="note" id="similar-note"></p>
-    <div class="chips-row" id="similar-variants" role="group" aria-label="Forms of the term"></div>
-    <ol class="similar-list" id="similar-list"></ol>
-  </dialog>
 
-  <script src="data/taxonomy.js"></script>
-  <script src="data/vocabulary.js"></script>
-  <script src="data/sample-data.js"></script>
-  <script src="js/analysis.js"></script>
-  <script src="js/io.js"></script>
-  <script src="js/app.js"></script>
+      <button id="filter-reset">Reset all</button>
+
+    </div><!-- /filter-panel -->
+
+    <!-- Filter summary bar -->
+    <div id="filter-summary"></div>
+
+    <!-- Bar chart section -->
+    <div id="chart-section">
+      <div id="chart-header">
+        <div id="chart-title">% of records with uncertainty or absence, by attribute</div>
+        <div id="chart-legend"></div>
+      </div>
+      <div id="bar-chart"></div>
+    </div>
+
+    <!-- Bottom: record list + field cards -->
+    <div id="bottom">
+
+      <div id="left-panel">
+        <div id="list-header">
+          <div id="list-context">All records</div>
+          <div id="list-count"></div>
+        </div>
+        <div id="record-list-wrap">
+          <div id="record-list-empty" hidden>No records match.</div>
+          <div id="record-list"></div>
+        </div>
+      </div>
+
+      <div id="right-panel">
+        <div id="right-empty">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.1">
+            <rect x="5" y="3" width="26" height="30" rx="3"/><line x1="10" y1="10" x2="26" y2="10"/><line x1="10" y1="16" x2="20" y2="16"/><line x1="10" y1="22" x2="18" y2="22"/>
+          </svg>
+          <p><strong>Select a record to inspect it</strong>Click a record in the list to see its field-level flags. Use the filters above to narrow the selection.</p>
+        </div>
+        <div id="detail-header" hidden>
+          <div id="detail-title"></div>
+          <div id="detail-sub"></div>
+          <div id="detail-dim-tabs">
+            <button class="dim-tab active" data-dtab="all">All fields</button>
+            <button class="dim-tab" data-dtab="Temporal">Temporal</button>
+            <button class="dim-tab" data-dtab="Spatial">Spatial</button>
+            <button class="dim-tab" data-dtab="Textual">Textual</button>
+            <button class="dim-tab" data-dtab="Attributional">Attributional</button>
+          </div>
+        </div>
+        <div id="field-cards-wrap" hidden>
+          <div id="field-cards-content"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div id="modal">
+    <div id="modal-header">
+      <div><div id="modal-title"></div><div id="modal-sub"></div></div>
+      <button id="modal-close" aria-label="Close">×</button>
+    </div>
+    <div id="modal-body">
+      <div id="modal-callout" class="modal-callout"></div>
+      <div><div class="modal-section-label">Term variants in cluster</div><div id="modal-term-chips" class="term-chips"></div></div>
+      <div><div class="modal-section-label">Records sharing this cluster</div><div id="modal-record-list" class="modal-record-list"></div></div>
+    </div>
+    <div id="modal-footer">
+      <button id="modal-align-btn" class="modal-btn slate" hidden>Align inconsistent terms</button>
+      <button id="modal-flag-btn"  class="modal-btn danger" hidden>Flag for community review</button>
+      <button id="modal-close-2"   class="modal-btn neutral">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── APP LOGIC ─────────────────────────────────────────────────────────── -->
+<script>
+(function () {
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  // Filters are multi-select sets (toggle). Clicking the bar also filters attrs.
+  let state = {
+    dims:           new Set(),   // selected dimensions (empty = all)
+    attrs:          new Set(),   // selected attribute keys for filtering (empty = all)
+    issues:         new Set(),   // selected issue types (empty = all)
+    highlightedBar: null,        // key of bar row highlighted by clicking the chart
+    selectedRecord: null,
+    detailDimTab:   'all',
+    searchQuery:    '',
+  };
+
+  // ── DOM ───────────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const barChart        = $('bar-chart');
+  const recordList      = $('record-list');
+  const recordEmpty     = $('record-list-empty');
+  const listContext     = $('list-context');
+  const listCount       = $('list-count');
+  const rightEmpty      = $('right-empty');
+  const detailHeader    = $('detail-header');
+  const detailTitle     = $('detail-title');
+  const detailSub       = $('detail-sub');
+  const fieldCardsWrap  = $('field-cards-wrap');
+  const fieldCardsContent = $('field-cards-content');
+  const modalOverlay    = $('modal-overlay');
+  const filterSummary   = $('filter-summary');
+  const chartTitle      = $('chart-title');
+  const chartLegend     = $('chart-legend');
+  const searchInput     = $('search-input');
+
+  // ── Dropdown wiring ───────────────────────────────────────────────────────
+  const DROPDOWNS = [
+    { id: 'fdd-dim',   stateSet: state.dims,   triggerId: 'fdd-dim-trigger',   countId: 'fdd-dim-count',   menuId: 'fdd-dim-menu',   labelDefault: 'Dimension'  },
+    { id: 'fdd-attr',  stateSet: state.attrs,  triggerId: 'fdd-attr-trigger',  countId: 'fdd-attr-count',  menuId: 'fdd-attr-menu',  labelDefault: 'Attribute'  },
+    { id: 'fdd-issue', stateSet: state.issues, triggerId: 'fdd-issue-trigger', countId: 'fdd-issue-count', menuId: 'fdd-issue-menu', labelDefault: 'Issue type' },
+  ];
+
+  function updateDropdownUI(dd) {
+    const trigger = $(dd.triggerId);
+    const count   = $(dd.countId);
+    const wrap    = $(dd.id);
+    const n = dd.stateSet.size;
+    count.textContent = n;
+    trigger.classList.toggle('has-value', n > 0);
+    // Update label: show selected values if 1–2, else count
+    const lbl = trigger.querySelector('.fdd-label');
+    if (n === 0) {
+      lbl.textContent = dd.labelDefault;
+    } else if (n <= 2) {
+      lbl.textContent = [...dd.stateSet].join(', ');
+    } else {
+      lbl.textContent = dd.labelDefault;
+    }
+    // Sync checkboxes
+    wrap.querySelectorAll('.fdd-item').forEach(item => {
+      item.classList.toggle('selected', dd.stateSet.has(item.dataset.val));
+    });
+  }
+
+  function updateAllDropdownUIs() {
+    DROPDOWNS.forEach(updateDropdownUI);
+    const anyActive = state.dims.size > 0 || state.attrs.size > 0 || state.issues.size > 0;
+    $('filter-reset').classList.toggle('visible', anyActive);
+  }
+
+  // Open/close logic — only one open at a time
+  function closeAllDropdowns(except) {
+    DROPDOWNS.forEach(dd => {
+      if (dd.id !== except) $(dd.id).classList.remove('open');
+    });
+  }
+
+  DROPDOWNS.forEach(dd => {
+    const trigger = $(dd.triggerId);
+    const wrap    = $(dd.id);
+    const menu    = $(dd.menuId);
+
+    trigger.addEventListener('click', e => {
+      e.stopPropagation();
+      const isOpen = wrap.classList.contains('open');
+      closeAllDropdowns();
+      wrap.classList.toggle('open', !isOpen);
+    });
+
+    menu.addEventListener('click', e => {
+      const item = e.target.closest('.fdd-item');
+      if (item) {
+        const val = item.dataset.val;
+        if (dd.stateSet.has(val)) dd.stateSet.delete(val);
+        else dd.stateSet.add(val);
+        updateDropdownUI(dd);
+        updateAllDropdownUIs();
+        onFilterChange();
+        return;
+      }
+      const clrBtn = e.target.closest('.fdd-clear');
+      if (clrBtn) {
+        dd.stateSet.clear();
+        updateDropdownUI(dd);
+        updateAllDropdownUIs();
+        onFilterChange();
+      }
+    });
+  });
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', () => closeAllDropdowns());
+
+  // Reset all
+  $('filter-reset').addEventListener('click', () => {
+    state.dims.clear(); state.attrs.clear(); state.issues.clear();
+    updateAllDropdownUIs();
+    onFilterChange();
+  });
+
+  searchInput.addEventListener('input', () => {
+    state.searchQuery = searchInput.value.trim();
+    renderRecordList();
+  });
+
+  // ── Highlight a bar row by clicking it (independent from attr filter) ──────
+  function toggleAttrFromBar(attrKey) {
+    // Clicking the same bar again deselects it
+    state.highlightedBar = state.highlightedBar === attrKey ? null : attrKey;
+    renderBarChart(); // just re-render highlights, no filter change needed
+  }
+
+  // ── Analytics ─────────────────────────────────────────────────────────────
+
+  // For a given attr, count ALL flags — no filters applied
+  function attrFlagCountsAll(attrKey) {
+    const counts = { incomplete:0, inconsistent:0, contested:0, missing:0 };
+    for (const rec of RECORDS) {
+      const field = rec.fields[attrKey];
+      if (!field) continue;
+      if (field.missing) {
+        counts.missing++;
+      } else if (field.flags) {
+        for (const flag of field.flags) {
+          counts[flag.type] = (counts[flag.type] || 0) + 1;
+        }
+      }
+    }
+    return counts;
+  }
+
+  // For a given attr, count flags matching the issue filter only (ignores dim)
+  // Used in issue-filtered mode so bars show the right issue-type counts
+  function attrFlagCountsByIssue(attrKey) {
+    const counts = { incomplete:0, inconsistent:0, contested:0, missing:0 };
+    for (const rec of RECORDS) {
+      const field = rec.fields[attrKey];
+      if (!field) continue;
+      if (field.missing) {
+        if (state.issues.size === 0 || state.issues.has('missing')) counts.missing++;
+      } else if (field.flags) {
+        for (const flag of field.flags) {
+          if (state.issues.size === 0 || state.issues.has(flag.type)) {
+            counts[flag.type] = (counts[flag.type] || 0) + 1;
+          }
+        }
+      }
+    }
+    return counts;
+  }
+
+  // How many records have any flag for this attr (unfiltered)
+  function attrFlaggedRecordCount(attrKey) {
+    let n = 0;
+    for (const rec of RECORDS) {
+      const field = rec.fields[attrKey];
+      if (!field) continue;
+      if (field.missing || (field.flags && field.flags.length > 0)) n++;
+    }
+    return n;
+  }
+
+  // ── Render bar chart ──────────────────────────────────────────────────────
+  // Chart always shows ALL 7 attributes.
+  // Mode is determined by what filters are active — independently:
+  //   • No filters          → overview: single bar, % of records flagged
+  //   • Issue filter only   → stacked by issue type (matching counts highlighted)
+  //   • Dim filter only     → overview bars but non-matching dims are greyed
+  //   • Both                → stacked by issue type, non-matching dims greyed
+  //   • Attr filter         → only highlights the row (never changes mode)
+  function renderBarChart() {
+    const attrs = ALL_ATTRS;
+    const issueActive = state.issues.size > 0;
+    const dimActive   = state.dims.size > 0;
+    const N = RECORDS.length;
+
+    // Legend and title
+    if (issueActive) {
+      chartTitle.textContent = 'Flags by issue type';
+      chartLegend.innerHTML = [...state.issues].map(t => {
+        const colours = {
+          incomplete:   'var(--c-incomplete-bar)',
+          inconsistent: 'var(--c-inconsistent-bar)',
+          contested:    'var(--c-contested-bar)',
+          missing:      'var(--c-missing-bar)',
+        };
+        return `<div class="legend-item"><div class="legend-swatch" style="background:${colours[t]};opacity:${t==='missing'?.6:1}"></div> ${t}</div>`;
+      }).join('');
+    } else {
+      chartTitle.textContent = '% of records with any flag, by attribute';
+      chartLegend.innerHTML = `
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--blue-solid)"></div> uncertain</div>
+        <div class="legend-item"><div class="legend-swatch missing"></div> absent</div>
+      `;
+    }
+
+    // Pre-compute max for stacked mode (over all attrs, so scale stays consistent)
+    let maxVal = 1;
+    if (issueActive) {
+      for (const key of attrs) {
+        const c = attrFlagCountsByIssue(key);
+        const t = c.incomplete + c.inconsistent + c.contested + c.missing;
+        if (t > maxVal) maxVal = t;
+      }
+    }
+
+    barChart.innerHTML = '';
+
+    for (const key of attrs) {
+      // Bar highlighting comes from clicking the bar, not from the attr filter
+      const isHighlighted = state.highlightedBar === key;
+      // Greyed when dim filter is on and this attr's dim is excluded
+      const isOutOfDim = dimActive && !state.dims.has(ATTR_DIM[key]);
+
+      const row = document.createElement('div');
+      row.className = 'bar-row' + (isHighlighted ? ' selected' : '');
+      row.style.opacity = isOutOfDim ? '0.28' : '1';
+      row.dataset.attrkey = key;
+
+      // Label: human name + JSON key below
+      const lbl = document.createElement('div');
+      lbl.className = 'bar-row-label';
+      lbl.innerHTML = `
+        <div class="lbl-name">
+          ${ATTR_LABELS[key]}
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${DIM_COLOURS[ATTR_DIM[key]]};flex-shrink:0;opacity:0.7"></span>
+        </div>
+        <div class="lbl-key">${key}</div>
+      `;
+
+      const track = document.createElement('div');
+      track.className = 'bar-track';
+
+      const badge = document.createElement('div');
+      badge.className = 'bar-counts';
+
+      if (!issueActive) {
+        // ── Overview mode: single bar, % of total records flagged ──
+        const flaggedN   = attrFlaggedRecordCount(key);
+        const allCounts  = attrFlagCountsAll(key);
+        const uncertainN = allCounts.incomplete + allCounts.inconsistent + allCounts.contested;
+        const missingN   = allCounts.missing;
+
+        if (flaggedN === 0) {
+          const empty = document.createElement('div');
+          empty.style.cssText = 'height:10px;width:3px;border-radius:2px;background:var(--border-mid);opacity:.4;position:relative;z-index:1;';
+          track.appendChild(empty);
+        } else {
+          if (uncertainN > 0) {
+            const seg = document.createElement('div');
+            seg.className = 'bar-segment';
+            seg.style.cssText = `width:${uncertainN / N * 100}%;background:var(--blue-solid);`;
+            track.appendChild(seg);
+          }
+          if (missingN > 0) {
+            if (uncertainN > 0) { const sp = document.createElement('div'); sp.className = 'bar-spacer'; track.appendChild(sp); }
+            const seg = document.createElement('div');
+            seg.className = 'bar-segment';
+            seg.style.cssText = `width:${missingN / N * 100}%;background:repeating-linear-gradient(135deg,var(--blue-fill) 0px,var(--blue-fill) 2px,transparent 2px,transparent 5px);border:1px dashed var(--border-miss);`;
+            track.appendChild(seg);
+          }
+        }
+        badge.innerHTML = flaggedN > 0
+          ? `<span class="n-u">${Math.round(flaggedN / N * 100)}%</span>`
+          : `<span style="color:var(--border-mid)">—</span>`;
+
+      } else {
+        // ── Issue-filtered mode: stacked segments by issue type ──
+        const counts = attrFlagCountsByIssue(key);
+        const total  = counts.incomplete + counts.inconsistent + counts.contested + counts.missing;
+
+        if (total === 0) {
+          const empty = document.createElement('div');
+          empty.style.cssText = 'height:10px;width:3px;border-radius:2px;background:var(--border-mid);opacity:.4;position:relative;z-index:1;';
+          track.appendChild(empty);
+        } else {
+          const segOrder = ['incomplete','inconsistent','contested','missing'];
+          const segCls   = ['incomplete','inconsistent','contested','missing-seg'];
+          for (let s = 0; s < segOrder.length; s++) {
+            const n = counts[segOrder[s]];
+            if (n === 0) continue;
+            // Only render if this issue type is in the active filter
+            if (!state.issues.has(segOrder[s])) continue;
+            const seg = document.createElement('div');
+            seg.className = `bar-segment ${segCls[s]}`;
+            seg.style.width = (n / maxVal * 100) + '%';
+            track.appendChild(seg);
+          }
+        }
+        badge.innerHTML = total > 0
+          ? `<span class="n-u">${total}</span>`
+          : `<span style="color:var(--border-mid)">—</span>`;
+      }
+
+      row.appendChild(lbl);
+      row.appendChild(track);
+      row.appendChild(badge);
+      row.addEventListener('click', () => toggleAttrFromBar(key));
+      barChart.appendChild(row);
+    }
+  }
+
+  // ── Filter summary ────────────────────────────────────────────────────────
+  function renderFilterSummary() {
+    const parts = [];
+    if (state.dims.size > 0)   parts.push([...state.dims].join(', '));
+    if (state.attrs.size > 0)  parts.push([...state.attrs].map(k => ATTR_LABELS[k]).join(', '));
+    if (state.issues.size > 0) parts.push([...state.issues].join(', '));
+    if (state.searchQuery)     parts.push(`"${state.searchQuery}"`);
+
+    if (parts.length === 0) {
+      filterSummary.classList.remove('visible');
+      filterSummary.textContent = '';
+    } else {
+      filterSummary.classList.add('visible');
+      filterSummary.innerHTML = `Showing: <span>${parts.join(' · ')}</span>`;
+    }
+  }
+
+  // ── Record list ───────────────────────────────────────────────────────────
+  function recordMatchesFilters(rec) {
+    const q = state.searchQuery.toLowerCase();
+    if (q && !String(rec.id).includes(q) && !rec.title.toLowerCase().includes(q)) return false;
+
+    // Must have at least one flag that satisfies all active filters
+    for (const [key, field] of Object.entries(rec.fields)) {
+      if (state.attrs.size > 0 && !state.attrs.has(key)) continue;
+      if (state.dims.size > 0  && !state.dims.has(ATTR_DIM[key])) continue;
+
+      if (field.missing) {
+        if (state.issues.size === 0 || state.issues.has('missing')) return true;
+      } else if (field.flags && field.flags.length > 0) {
+        for (const flag of field.flags) {
+          if (state.issues.size === 0 || state.issues.has(flag.type)) return true;
+        }
+      }
+    }
+    // If no active filters at all, show all records
+    if (state.attrs.size === 0 && state.dims.size === 0 && state.issues.size === 0 && !q) return true;
+    return false;
+  }
+
+  function recordFlagSummary(rec) {
+    const types = new Set();
+    let missing = false;
+    for (const field of Object.values(rec.fields)) {
+      if (field.missing) missing = true;
+      if (field.flags) for (const f of field.flags) types.add(f.type);
+    }
+    if (missing) types.add('missing');
+    return [...types];
+  }
+
+  function totalFlagsForRecord(rec) {
+    let n = 0;
+    for (const f of Object.values(rec.fields)) {
+      if (f.missing) n++;
+      else if (f.flags && f.flags.length > 0) n++;
+    }
+    return n;
+  }
+
+  function renderRecordList() {
+    const hasAnyFilter = state.attrs.size > 0 || state.dims.size > 0 || state.issues.size > 0 || state.searchQuery;
+    const matching = RECORDS
+      .filter(hasAnyFilter ? recordMatchesFilters : () => true)
+      .sort((a,b) => totalFlagsForRecord(b) - totalFlagsForRecord(a));
+
+    recordList.innerHTML = '';
+    listCount.textContent = matching.length + ' / ' + RECORDS.length;
+
+    if (hasAnyFilter) {
+      const parts = [];
+      if (state.dims.size > 0)   parts.push([...state.dims].join(', '));
+      if (state.attrs.size > 0)  parts.push([...state.attrs].map(k => ATTR_LABELS[k]).join(', '));
+      if (state.issues.size > 0) parts.push([...state.issues].join(', '));
+      listContext.textContent = parts.length ? parts.join(' · ') + ' — flagged records' : 'Filtered records';
+    } else {
+      listContext.textContent = 'All records · most flagged first';
+    }
+
+    if (matching.length === 0) {
+      recordEmpty.hidden = false;
+      return;
+    }
+    recordEmpty.hidden = true;
+
+    for (const rec of matching) {
+      const types = recordFlagSummary(rec);
+      const row = document.createElement('div');
+      row.className = 'record-row' + (state.selectedRecord === rec.id ? ' selected' : '');
+      row.innerHTML = `
+        <div class="record-thumb">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1"><rect x="1" y="1" width="10" height="10" rx="1"/><path d="M1 8l3-3 2 2 2-2.5 3 3.5"/></svg>
+        </div>
+        <div class="record-meta">
+          <span class="record-id">${rec.id}</span>
+          <span class="record-title">${rec.title}</span>
+          <div class="record-pills">${types.map(t => `<span class="pill ${t}">${t}</span>`).join('')}</div>
+        </div>
+      `;
+      row.addEventListener('click', () => {
+        state.selectedRecord = rec.id;
+        renderRecordList();
+        renderFieldCards(rec);
+      });
+      recordList.appendChild(row);
+    }
+  }
+
+  // ── Field cards ───────────────────────────────────────────────────────────
+  function renderFieldCards(rec) {
+    rightEmpty.hidden   = true;
+    detailHeader.hidden = false;
+    fieldCardsWrap.hidden = false;
+
+    detailTitle.textContent = rec.title;
+    detailSub.textContent   = `Record ${rec.id}`;
+
+    const activeTab = state.detailDimTab;
+    detailHeader.querySelectorAll('.dim-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.dtab === activeTab);
+    });
+
+    fieldCardsContent.innerHTML = '';
+    const dimsToShow = activeTab === 'all' ? DIMENSIONS : [activeTab];
+
+    for (const dim of dimsToShow) {
+      const attrsInDim = ATTRIBUTES[dim] || [];
+      if (attrsInDim.length === 0) continue;
+
+      const grp = document.createElement('div');
+      grp.className = 'dim-group';
+      const hd = document.createElement('div');
+      hd.className = 'dim-group-heading';
+      hd.textContent = dim;
+      grp.appendChild(hd);
+
+      const grid = document.createElement('div');
+      grid.className = 'cards-grid';
+
+      for (const key of attrsInDim) {
+        const field = rec.fields[key];
+        if (!field) { grid.appendChild(makePlaceholderCard(key)); continue; }
+
+        if (field.termCluster) {
+          grid.appendChild(makeTermCard(key, field));
+        } else if (field.missing) {
+          grid.appendChild(makeMissingCard(key));
+        } else {
+          grid.appendChild(makeFieldCard(key, field));
+        }
+      }
+      grp.appendChild(grid);
+      fieldCardsContent.appendChild(grp);
+    }
+  }
+
+  function makeFieldCard(key, field) {
+    const card = document.createElement('div');
+    const hasFl = field.flags && field.flags.length > 0;
+    card.className = 'field-card ' + (hasFl ? 'flagged' : 'complete');
+    card.innerHTML = `
+      <div class="field-card-key">${key}</div>
+      <div class="field-card-label">${ATTR_LABELS[key]}</div>
+      <div class="field-card-value">${field.value}</div>
+      ${hasFl ? `<div class="card-tags">${field.flags.map(f => `<span class="nature-tag ${f.type}">${f.type}</span>`).join('')}</div>` : ''}
+    `;
+    return card;
+  }
+
+  function makeMissingCard(key) {
+    const card = document.createElement('div');
+    card.className = 'field-card missing';
+    card.innerHTML = `
+      <div class="field-card-key">${key}</div>
+      <div class="field-card-label">${ATTR_LABELS[key]}</div>
+      <div class="field-card-value">—</div>
+      <div class="card-tags"><span class="nature-tag missing">absent</span></div>
+    `;
+    return card;
+  }
+
+  function makePlaceholderCard(key) {
+    const card = document.createElement('div');
+    card.className = 'field-card placeholder';
+    card.innerHTML = `<div class="field-card-key">${key}</div><div class="field-card-label">${ATTR_LABELS[key]}</div>`;
+    return card;
+  }
+
+  function makeTermCard(key, field) {
+    const cluster = TERM_CLUSTERS[field.termCluster];
+    const types   = new Set(cluster.terms.map(t => t.type));
+    const cardCls = types.has('contested') && types.has('inconsistent') ? 'both'
+                  : types.has('contested')  ? 'contested'
+                  : 'inconsistent';
+    const card = document.createElement('div');
+    card.className = `term-card ${cardCls}`;
+    card.innerHTML = `
+      <div class="term-card-key">${key}</div>
+      <div class="term-card-label">${cluster.name}</div>
+      <div class="term-card-tags">${cluster.terms.slice(0,3).map(t => `<span class="nature-tag ${t.type}">${t.value}</span>`).join('')}${cluster.terms.length > 3 ? `<span class="nature-tag inconsistent">+${cluster.terms.length-3}</span>` : ''}</div>
+    `;
+    card.addEventListener('click', () => openModal(field.termCluster));
+    return card;
+  }
+
+  // ── Modal ─────────────────────────────────────────────────────────────────
+  function openModal(clusterId) {
+    const cl = TERM_CLUSTERS[clusterId];
+    const types = new Set(cl.terms.map(t => t.type));
+    const mode  = types.has('contested') ? 'contested' : 'inconsistent';
+    $('modal-title').textContent = cl.name;
+    $('modal-sub').textContent   = `${cl.terms.length} term variants · ${cl.records.length} records affected`;
+    const callout = $('modal-callout');
+    callout.className = `modal-callout ${mode}`;
+    callout.textContent = mode === 'contested'
+      ? 'This cluster contains contested terminology. Resolution requires community review and cannot be aligned automatically.'
+      : 'This cluster contains inconsistent terminology variants that can be aligned to a preferred form.';
+    $('modal-term-chips').innerHTML = cl.terms.map(t => `<span class="term-chip ${t.type}">${t.value}</span>`).join('');
+    $('modal-record-list').innerHTML = cl.records.map(rid => {
+      const rec = RECORDS.find(r => r.id === rid);
+      return rec ? `<div class="modal-record-item"><span class="rid">${rid}</span><span class="rtitle">${rec.title}</span><span class="rbadge ${mode}">${mode}</span></div>` : '';
+    }).join('');
+    $('modal-align-btn').hidden = mode !== 'inconsistent';
+    $('modal-flag-btn').hidden  = mode !== 'contested';
+    modalOverlay.hidden = false;
+  }
+
+  $('modal-close').addEventListener('click',   () => { modalOverlay.hidden = true; });
+  $('modal-close-2').addEventListener('click', () => { modalOverlay.hidden = true; });
+  modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.hidden = true; });
+
+  // Dim tabs in detail panel
+  document.querySelectorAll('.dim-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.detailDimTab = btn.dataset.dtab;
+      const rec = RECORDS.find(r => r.id === state.selectedRecord);
+      if (rec) renderFieldCards(rec);
+    });
+  });
+
+  // ── Master update ─────────────────────────────────────────────────────────
+  function onFilterChange() {
+    renderFilterSummary();
+    renderBarChart();
+    renderRecordList();
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  updateAllDropdownUIs();
+  onFilterChange();
+
+})();
+</script>
 </body>
 </html>
