@@ -233,6 +233,10 @@ input  { font-family: inherit; }
 .fdd-issue-dot {
   width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0;
 }
+.bar-track.grouped { flex-direction: column; align-items: stretch; justify-content: center; gap: 2px; }
+.bar-track.grouped::before { display: none; }
+.bar-type-line { display: flex; align-items: center; height: 6px; }
+.bar-type-line .bar-segment { height: 6px; border-radius: 2px; }
 .fdd-menu-note {
   padding: 7px 11px 6px; font-size: 10px; line-height: 1.4; color: var(--fg-3);
   border-bottom: 0.5px solid var(--border); max-width: 220px;
@@ -999,26 +1003,6 @@ const RECORDS = [
     return counts;
   }
 
-  // For a given attr, count flags matching the issue filter only (ignores dim)
-  // Used in issue-filtered mode so bars show the right issue-type counts
-  function attrFlagCountsByIssue(attrKey) {
-    const counts = { incomplete:0, inconsistent:0, contested:0, missing:0 };
-    for (const rec of RECORDS) {
-      const field = rec.fields[attrKey];
-      if (!field) continue;
-      if (field.missing) {
-        if (state.issues.size === 0 || state.issues.has('missing')) counts.missing++;
-      } else if (field.flags) {
-        for (const flag of field.flags) {
-          if (state.issues.size === 0 || state.issues.has(flag.type)) {
-            counts[flag.type] = (counts[flag.type] || 0) + 1;
-          }
-        }
-      }
-    }
-    return counts;
-  }
-
   // How many records have any flag for this attr (unfiltered)
   function attrFlaggedRecordCount(attrKey) {
     let n = 0;
@@ -1052,7 +1036,7 @@ const RECORDS = [
 
     // Legend and title
     if (issueActive) {
-      chartTitle.textContent = scope + 'Uncertain values by type (absence not included)';
+      chartTitle.textContent = scope + '% of records with each uncertainty type, by attribute (absence not included)';
       chartLegend.innerHTML = [...state.issues].map(t => {
         const colours = {
           incomplete:   'var(--c-incomplete-bar)',
@@ -1062,7 +1046,7 @@ const RECORDS = [
         };
         if (t === 'missing') return `<div class="legend-item"><div class="legend-swatch missing" style="border-color:${colours[t]}"></div> absent</div>`;
         return `<div class="legend-item"><div class="legend-swatch" style="background:${colours[t]}"></div> ${t}</div>`;
-      }).join('') + '<div class="legend-item legend-note">absence excluded</div>';
+      }).join('') + '<div class="legend-item legend-note">a field can carry up to two types · absence excluded</div>';
     } else {
       chartTitle.textContent = scope + '% of records with uncertainty or absence, by attribute';
       chartLegend.innerHTML = `
@@ -1071,15 +1055,6 @@ const RECORDS = [
       `;
     }
 
-    // Pre-compute max for stacked mode (over all attrs, so scale stays consistent)
-    let maxVal = 1;
-    if (issueActive) {
-      for (const key of ALL_ATTRS) { // all attributes, so the scale stays the same when some are hidden
-        const c = attrFlagCountsByIssue(key);
-        const t = c.incomplete + c.inconsistent + c.contested + c.missing;
-        if (t > maxVal) maxVal = t;
-      }
-    }
 
     barChart.innerHTML = '';
     if (attrs.length === 0) {
@@ -1143,30 +1118,34 @@ const RECORDS = [
           : `<span style="color:var(--border-mid)">—</span>`;
 
       } else {
-        // ── Issue-filtered mode: stacked segments by issue type ──
-        const counts = attrFlagCountsByIssue(key);
-        const total  = counts.incomplete + counts.inconsistent + counts.contested + counts.missing;
+        // ── Uncertainty-type mode: one thin bar per selected type, % of records ──
+        // A field can carry one or two uncertainty types, so each type is measured
+        // separately (records counted once per type) instead of stacking flags.
+        const types = ISSUE_TYPES.filter(t => state.issues.has(t));
+        const withType = t => RECORDS.filter(r => {
+          const f = r.fields[key];
+          return f && !f.missing && (f.flags || []).some(fl => fl.type === t);
+        }).length;
+        const anyType = RECORDS.filter(r => {
+          const f = r.fields[key];
+          return f && !f.missing && (f.flags || []).some(fl => state.issues.has(fl.type));
+        }).length;
 
-        if (total === 0) {
-          const empty = document.createElement('div');
-          empty.style.cssText = 'height:10px;width:3px;border-radius:2px;background:var(--border-mid);opacity:.4;position:relative;z-index:1;';
-          track.appendChild(empty);
-        } else {
-          const segOrder = ['incomplete','inconsistent','contested','missing'];
-          const segCls   = ['incomplete','inconsistent','contested','missing-seg'];
-          for (let s = 0; s < segOrder.length; s++) {
-            const n = counts[segOrder[s]];
-            if (n === 0) continue;
-            // Only render if this issue type is in the active filter
-            if (!state.issues.has(segOrder[s])) continue;
-            const seg = document.createElement('div');
-            seg.className = `bar-segment ${segCls[s]}`;
-            seg.style.width = (n / maxVal * 100) + '%';
-            track.appendChild(seg);
-          }
+        track.classList.add('grouped');
+        for (const t of types) {
+          const n = withType(t);
+          const line = document.createElement('div');
+          line.className = 'bar-type-line';
+          const seg = document.createElement('div');
+          seg.className = `bar-segment ${t}`;
+          seg.style.width = n ? `${n / N * 100}%` : '3px';
+          if (!n) seg.style.opacity = '0.25';
+          line.title = `${t}: ${n} of ${N} records (${Math.round(n / N * 100)}%)`;
+          line.appendChild(seg);
+          track.appendChild(line);
         }
-        badge.innerHTML = total > 0
-          ? `<span class="n-u">${total}</span>`
+        badge.innerHTML = anyType > 0
+          ? `<span class="n-u" title="records with any selected type">${Math.round(anyType / N * 100)}%</span>`
           : `<span style="color:var(--border-mid)">—</span>`;
       }
 
