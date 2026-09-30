@@ -544,7 +544,7 @@ input  { font-family: inherit; }
 <!-- ─── DATA ──────────────────────────────────────────────────────────────── -->
 <script>
 const DIMENSIONS = ['Temporal','Spatial','Textual','Attributional'];
-const ISSUE_TYPES = ['incomplete','inconsistent','contested','missing'];
+const ISSUE_TYPES = ['incomplete','inconsistent','contested']; // absence is not an issue type
 
 const ATTRIBUTES = {
   Temporal:      ['dctermsCreated'],
@@ -759,11 +759,6 @@ const RECORDS = [
             <div class="fdd-check"></div>
             <span class="fdd-issue-dot" style="background:var(--c-contested-bar)"></span>
             Contested
-          </div>
-          <div class="fdd-item" data-val="missing">
-            <div class="fdd-check"></div>
-            <span class="fdd-issue-dot" style="background:var(--c-missing-bar);opacity:.7"></span>
-            Absent
           </div>
           <div class="fdd-menu-footer"><button class="fdd-clear" data-clr="issue">Clear</button></div>
         </div>
