@@ -233,6 +233,11 @@ input  { font-family: inherit; }
 .fdd-issue-dot {
   width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0;
 }
+.fdd-menu-note {
+  padding: 7px 11px 6px; font-size: 10px; line-height: 1.4; color: var(--fg-3);
+  border-bottom: 0.5px solid var(--border); max-width: 220px;
+}
+.legend-note { font-style: italic; }
 .fdd-menu-footer {
   display: flex; align-items: center; justify-content: flex-end;
   padding: 5px 11px 7px; border-top: 0.5px solid var(--border);
@@ -740,11 +745,12 @@ const RECORDS = [
       <!-- Issue type dropdown -->
       <div class="fdd-wrap" id="fdd-issue">
         <div class="fdd-trigger" id="fdd-issue-trigger">
-          <span class="fdd-label">Issue type</span>
+          <span class="fdd-label">Uncertainty type</span>
           <span class="fdd-count" id="fdd-issue-count">0</span>
           <span class="fdd-caret">▾</span>
         </div>
         <div class="fdd-menu" id="fdd-issue-menu">
+          <div class="fdd-menu-note">Applies to uncertain values only; absence is not an uncertainty type.</div>
           <div class="fdd-item" data-val="incomplete">
             <div class="fdd-check"></div>
             <span class="fdd-issue-dot" style="background:var(--c-incomplete-bar)"></span>
@@ -880,7 +886,7 @@ const RECORDS = [
   const DROPDOWNS = [
     { id: 'fdd-dim',   stateSet: state.dims,   triggerId: 'fdd-dim-trigger',   countId: 'fdd-dim-count',   menuId: 'fdd-dim-menu',   labelDefault: 'Dimension'  },
     { id: 'fdd-attr',  stateSet: state.attrs,  triggerId: 'fdd-attr-trigger',  countId: 'fdd-attr-count',  menuId: 'fdd-attr-menu',  labelDefault: 'Attribute'  },
-    { id: 'fdd-issue', stateSet: state.issues, triggerId: 'fdd-issue-trigger', countId: 'fdd-issue-count', menuId: 'fdd-issue-menu', labelDefault: 'Issue type' },
+    { id: 'fdd-issue', stateSet: state.issues, triggerId: 'fdd-issue-trigger', countId: 'fdd-issue-count', menuId: 'fdd-issue-menu', labelDefault: 'Uncertainty type' },
   ];
 
   function updateDropdownUI(dd) {
@@ -1046,7 +1052,7 @@ const RECORDS = [
 
     // Legend and title
     if (issueActive) {
-      chartTitle.textContent = scope + 'Flags by issue type';
+      chartTitle.textContent = scope + 'Uncertain values by type (absence not included)';
       chartLegend.innerHTML = [...state.issues].map(t => {
         const colours = {
           incomplete:   'var(--c-incomplete-bar)',
@@ -1056,7 +1062,7 @@ const RECORDS = [
         };
         if (t === 'missing') return `<div class="legend-item"><div class="legend-swatch missing" style="border-color:${colours[t]}"></div> absent</div>`;
         return `<div class="legend-item"><div class="legend-swatch" style="background:${colours[t]}"></div> ${t}</div>`;
-      }).join('');
+      }).join('') + '<div class="legend-item legend-note">absence excluded</div>';
     } else {
       chartTitle.textContent = scope + '% of records with uncertainty or absence, by attribute';
       chartLegend.innerHTML = `
@@ -1177,7 +1183,7 @@ const RECORDS = [
     const parts = [];
     if (state.dims.size > 0)   parts.push([...state.dims].join(', '));
     if (state.attrs.size > 0)  parts.push([...state.attrs].map(k => ATTR_LABELS[k]).join(', '));
-    if (state.issues.size > 0) parts.push([...state.issues].join(', '));
+    if (state.issues.size > 0) parts.push('uncertainty: ' + [...state.issues].join(', '));
     if (state.searchQuery)     parts.push(`"${state.searchQuery}"`);
 
     if (parts.length === 0) {
@@ -1245,7 +1251,7 @@ const RECORDS = [
       const parts = [];
       if (state.dims.size > 0)   parts.push([...state.dims].join(', '));
       if (state.attrs.size > 0)  parts.push([...state.attrs].map(k => ATTR_LABELS[k]).join(', '));
-      if (state.issues.size > 0) parts.push([...state.issues].join(', '));
+      if (state.issues.size > 0) parts.push('uncertainty: ' + [...state.issues].join(', '));
       listContext.textContent = parts.length ? parts.join(' · ') + ' — flagged records' : 'Filtered records';
     } else {
       listContext.textContent = 'All records · most flagged first';
@@ -1268,7 +1274,7 @@ const RECORDS = [
         <div class="record-meta">
           <span class="record-id">${rec.id}</span>
           <span class="record-title">${rec.title}</span>
-          <div class="record-pills">${types.map(t => `<span class="pill ${t}">${t}</span>`).join('')}</div>
+          <div class="record-pills">${types.map(t => `<span class="pill ${t}">${t === 'missing' ? 'absent' : t}</span>`).join('')}</div>
         </div>
       `;
       row.addEventListener('click', () => {
@@ -1337,7 +1343,7 @@ const RECORDS = [
       <div class="field-card-key">${key}</div>
       <div class="field-card-label">${ATTR_LABELS[key]}</div>
       <div class="field-card-value">${field.value}</div>
-      ${hasFl ? `<div class="card-tags">${field.flags.map(f => `<span class="nature-tag ${f.type}">${f.type}</span>`).join('')}</div>` : ''}
+      ${hasFl ? `<div class="card-tags">${field.flags.map(f => `<span class="nature-tag ${f.type}">${f.type === 'missing' ? 'absent' : f.type}</span>`).join('')}</div>` : ''}
     `;
     return card;
   }
