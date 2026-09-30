@@ -1029,18 +1029,24 @@ const RECORDS = [
   // Mode is determined by what filters are active — independently:
   //   • No filters          → overview: single bar, % of records flagged
   //   • Issue filter only   → stacked by issue type (matching counts highlighted)
-  //   • Dim filter only     → overview bars but non-matching dims are greyed
-  //   • Both                → stacked by issue type, non-matching dims greyed
+  //   • Dim filter          → only that dimension's attributes are shown
+  //   • Both                → stacked by issue type, selected dimensions only
   //   • Attr filter         → only the selected attributes are shown
   function renderBarChart() {
-    const attrs = state.attrs.size > 0 ? ALL_ATTRS.filter(k => state.attrs.has(k)) : ALL_ATTRS;
+    // Only the attributes of the selected dimensions / attributes are drawn
+    const attrs = ALL_ATTRS.filter(k =>
+      (state.dims.size === 0 || state.dims.has(ATTR_DIM[k])) &&
+      (state.attrs.size === 0 || state.attrs.has(k)));
     const issueActive = state.issues.size > 0;
     const dimActive   = state.dims.size > 0;
+    const scope = dimActive
+      ? `${DIMENSIONS.filter(d => state.dims.has(d)).join(' + ')} attributes only · `
+      : '';
     const N = RECORDS.length;
 
     // Legend and title
     if (issueActive) {
-      chartTitle.textContent = 'Flags by issue type';
+      chartTitle.textContent = scope + 'Flags by issue type';
       chartLegend.innerHTML = [...state.issues].map(t => {
         const colours = {
           incomplete:   'var(--c-incomplete-bar)',
@@ -1052,7 +1058,7 @@ const RECORDS = [
         return `<div class="legend-item"><div class="legend-swatch" style="background:${colours[t]}"></div> ${t}</div>`;
       }).join('');
     } else {
-      chartTitle.textContent = '% of records with any flag, by attribute';
+      chartTitle.textContent = scope + '% of records with uncertainty or absence, by attribute';
       chartLegend.innerHTML = `
         <div class="legend-item"><div class="legend-swatch uncertain"></div> uncertain</div>
         <div class="legend-item"><div class="legend-swatch missing"></div> absent</div>
@@ -1070,16 +1076,17 @@ const RECORDS = [
     }
 
     barChart.innerHTML = '';
+    if (attrs.length === 0) {
+      barChart.innerHTML = '<div class="bar-zero">No attribute belongs to both the selected dimension and the selected attributes.</div>';
+      return;
+    }
 
     for (const key of attrs) {
       // Bar highlighting comes from clicking the bar, not from the attr filter
       const isHighlighted = state.highlightedBar === key;
-      // Greyed when dim filter is on and this attr's dim is excluded
-      const isOutOfDim = dimActive && !state.dims.has(ATTR_DIM[key]);
 
       const row = document.createElement('div');
       row.className = 'bar-row' + (isHighlighted ? ' selected' : '');
-      row.style.opacity = isOutOfDim ? '0.28' : '1';
       row.dataset.attrkey = key;
 
       // Label: human name + JSON key below
@@ -1288,7 +1295,8 @@ const RECORDS = [
     });
 
     fieldCardsContent.innerHTML = '';
-    const dimsToShow = activeTab === 'all' ? DIMENSIONS : [activeTab];
+    const dimsToShow = (activeTab === 'all' ? DIMENSIONS : [activeTab])
+      .filter(d => state.dims.size === 0 || state.dims.has(d));
 
     for (const dim of dimsToShow) {
       const attrsInDim = (ATTRIBUTES[dim] || []).filter(k => state.attrs.size === 0 || state.attrs.has(k));
