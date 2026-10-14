@@ -5,43 +5,49 @@ uncertain or absent.
 
 ## The dashboard (`index.html`)
 
-Version 3 is a single self-contained page. It has no build step and no dependencies: open
-`index.html` in a browser, or run `npm start` and go to <http://localhost:8000>.
+The page has no build step and no dependencies. Open `index.html` in a browser, or run
+`npm start` and go to <http://localhost:8000>.
 
-It works on an embedded sample of 10 records (*Romani & Traveller Communities in Britain*) and
-seven attributes:
+It opens on a sample of **100 real Europeana records** (TopFoto, dataset 2024904, from the Record
+API). **Upload collection** (top right) loads your own file, which is processed in the browser:
+
+- a JSON export of Europeana **Record API** responses (an array of `/record/v2/{id}.json`
+  responses), or a saved **Search API** response
+- a **CSV** with Dublin Core columns: `dcTitle`, `dcDescription`, `dcSubject`, `dcCreator`,
+  `dctermsCreated` (or `year`), `edmCountry`, `dcType`; `dc:title` style headers work too
+
+Every record is flagged by the taxonomy engine (`js/analysis.js`, rules from
+`data/taxonomy.js`). `js/v3-adapter.js` turns the result into what the page shows.
 
 | Dimension | Attributes |
 | --- | --- |
-| Temporal | `dctermsCreated` (Date Created) |
+| Temporal | `dctermsCreated` (Date Created; Europeana's normalised `year` is used when it is empty) |
 | Spatial | `edmCountry` (Country) |
 | Textual | `dcTitle`, `dcDescription`, `dcSubject` |
 | Attributional | `dcCreator`, `dcType` |
 
-- **Filters**: multi-select Dimension, Attribute and Issue type (incomplete, inconsistent,
-  contested, absent), plus a search box.
-- **Bar chart**: one bar per attribute.
-  - With no issue filter, it shows the % of records with any flag, split into uncertain and absent.
-  - With an issue filter, the bar is stacked by issue type.
-  - Clicking a bar highlights it.
-- **Record list**: the records that match the filters, most flagged first, with issue pills.
-- **Field cards**: the selected record's fields, grouped by dimension. A field that belongs to a
-  term cluster opens a pop-up listing the term variants and the records that share them.
+- **Absent**: the field is empty, or holds only a placeholder such as "none" or "unknown".
+- **Uncertainty types**: incomplete, inconsistent and contested flags from the taxonomy rules. A
+  field can carry more than one. Hover over a tag to see the rule codes and reasons.
+- **Term clusters**: collection-wide variant groups (Gypsy / Gipsy / Romani / Roma, United
+  Kingdom / Great Britain / UK, …). The pop-up lists the variants with their counts (★ marks the
+  reference term) and the records that use them; click a record to open it.
+- **Linked entities**: values given as Wikidata or Getty AAT links show the name stored in the
+  record, and link to the entity.
+- **Proxy notes**: findings that come from comparing the provider and Europeana proxies, such as a
+  field that never reaches the Europeana proxy, appear as notes under the field.
 
-The sample records, flags and term clusters are written by hand in the `RECORDS` and
-`TERM_CLUSTERS` constants at the top of the page.
+The "Align inconsistent terms" and "Flag for community review" buttons in the pop-up do not do
+anything yet.
 
-## Taxonomy engine (not yet connected to the page)
+### Updating the bundled sample
 
-`js/analysis.js`, `js/io.js` and `data/` hold the engine built for earlier versions. It can:
+```
+python3 -I scripts/slim-europeana.py export.json data/collection-2024904.js
+```
 
-- read Europeana data (Search API items, Record API objects with the provider and Europeana
-  proxies, or CSV/JSON files)
-- flag it with the rules of the uncertainty-flagging taxonomy
-- find term clusters automatically (Gypsy / Gipsy / Romani / Roma, …)
-
-`npm test` runs its tests. Hooking it up would let the Version 3 page run on real collections
-instead of the embedded sample.
+The script removes the API key and request metadata that Record API exports contain, and keeps
+only the parts of each record the dashboard reads (7.4 MB → 340 KB for the sample).
 
 ## How the taxonomy is applied
 
@@ -129,7 +135,10 @@ npm run sample    # regenerate data/sample-data.js
 | --- | --- |
 | `js/analysis.js` | Taxonomy engine; runs in the browser and in Node |
 | `js/io.js` | CSV/JSON parsing; Europeana Search and Record API client |
-| `index.html` | The Version 3 dashboard (self-contained) |
+| `index.html` | The Version 3 dashboard |
+| `js/v3-adapter.js` | Engine output → the dashboard's records and term clusters |
+| `data/collection-2024904.js` | Bundled sample collection (slimmed Record API export) |
+| `scripts/slim-europeana.py` | Record API export → bundled sample, without the API key |
 | `data/taxonomy.js` | Generated from the taxonomy spreadsheet |
 | `data/vocabulary.js` | Collection word lists |
 | `data/sample-data.js` | Synthetic sample collection |

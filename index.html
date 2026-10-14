@@ -480,6 +480,31 @@ input  { font-family: inherit; }
 .term-card.contested    .term-card-label { color: var(--term-contested-fg); }
 .term-card-tags  { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 2px; }
 
+/* Loaded-data additions */
+#topbar-upload {
+  display: flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; flex-shrink: 0;
+  border-radius: var(--r); border: 0.5px solid var(--blue-sel); background: var(--blue-fill);
+  color: var(--blue-deep); font-size: 11px; font-weight: 500; cursor: pointer;
+}
+#topbar-upload:hover { background: var(--bg-hover); }
+#upload-input:focus-visible + #topbar-search, #topbar-upload:focus-within { outline: 2px solid var(--blue-sel); }
+#upload-status { font-size: 10px; color: var(--fg-3); max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#upload-status.error { color: var(--tag-contested-fg); white-space: normal; }
+.inconsistent-word { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); border-radius: 2px; padding: 0 2px; cursor: help; }
+.incomplete-word   { background: var(--tag-incomplete-bg);   color: var(--tag-incomplete-fg);   border-radius: 2px; padding: 0 2px; cursor: help; }
+.entity-link { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+.placeholder-value { font-style: italic; color: var(--fg-3); }
+.value-sep { color: var(--fg-3); }
+.field-card-info { font-size: 9.5px; color: var(--fg-3); line-height: 1.35; margin-top: 2px; }
+.nature-tag { cursor: help; }
+.term-card.both { border: 1.5px solid var(--term-contested-border); background: var(--bg-panel); }
+.term-card.both .term-card-label { color: var(--term-contested-fg); }
+.term-card .field-card-value { margin: 2px 0; }
+.term-chip b { font-weight: 600; opacity: 0.7; }
+button.modal-record-item { border: none; width: 100%; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+button.modal-record-item:hover { background: var(--bg-hover); }
+#detail-sub a { color: var(--blue-sel); }
+
 /* Modal */
 #modal-overlay {
   position: fixed; inset: 0; background: var(--modal-overlay);
@@ -574,105 +599,9 @@ const DIM_COLOURS = {
   Textual:'var(--dim-textual-bar)',  Attributional:'var(--dim-attributional-bar)',
 };
 
-const TERM_CLUSTERS = {
-  'gypsy-terminology': { name:'Romani / Gypsy terminology', terms:[{value:'Gypsy',type:'contested'},{value:'Romani',type:'inconsistent'},{value:'Roma',type:'inconsistent'},{value:'Traveller',type:'inconsistent'}], records:[1274,1275,1277,1281] },
-  'uk-coverage': { name:'UK / England coverage terms', terms:[{value:'United Kingdom',type:'inconsistent'},{value:'UK',type:'inconsistent'},{value:'England',type:'inconsistent'},{value:'Britain',type:'inconsistent'}], records:[1274,1276,1278] },
-  'photographic-type': { name:'Photographic / image type terms', terms:[{value:'photograph',type:'inconsistent'},{value:'image',type:'inconsistent'},{value:'still image',type:'inconsistent'}], records:[1274,1276,1277,1279,1280] },
-  'century-contested': { name:'Century vs. decade dating', terms:[{value:'20th century',type:'incomplete'},{value:'1960s',type:'incomplete'},{value:'c. 1965',type:'incomplete'},{value:'1960–1970',type:'incomplete'}], records:[1274,1275,1277,1282] },
-};
-
-const RECORDS = [
-  { id:1274, title:'Roma Caravan', thumbnail:null, fields:{
-    dcTitle:        {value:'Roma Caravan', flags:[{type:'inconsistent',dim:'Textual',note:'Title differs from record 1281 ("Gypsy Caravan") for same object.'}]},
-    dcDescription:  {value:'<span class="contested-word" title="\'Romani\' used inconsistently">Romani</span> family photographed outside their caravan in rural Yorkshire.', flags:[{type:'inconsistent',dim:'Textual'}], termCluster:'gypsy-terminology'},
-    dcSubject:      {missing:true, flags:[{type:'missing',dim:'Textual'}]},
-    dcCreator:      {value:'www.wikidata.org', flags:[{type:'incomplete',dim:'Attributional',note:'Creator resolved to a generic Wikidata URI.'}]},
-    dctermsCreated: {value:'20th Century', flags:[{type:'incomplete',dim:'Temporal',note:'Date only granular to century.'}], termCluster:'century-contested'},
-    edmCountry:     {value:'United Kingdom', flags:[{type:'inconsistent',dim:'Spatial',note:'"United Kingdom", "UK", and "England" coexist across comparable records.'}], termCluster:'uk-coverage'},
-    dcType:         {value:'image', flags:[{type:'inconsistent',dim:'Attributional',note:'"image", "photograph" and "still image" coexist.'}], termCluster:'photographic-type'},
-  }},
-  { id:1275, title:'Traveller Children at Play', thumbnail:null, fields:{
-    dcTitle:        {value:'Traveller Children at Play', flags:[]},
-    dcDescription:  {value:'<span class="contested-word" title="\'Gypsy\' is a contested term">Gypsy</span> children playing near a site in County Durham.', flags:[{type:'contested',dim:'Textual'}], termCluster:'gypsy-terminology'},
-    dcSubject:      {value:'Children; Play; Romani culture', flags:[{type:'incomplete',dim:'Textual',note:'Subject terms lack controlled vocabulary authority.'}]},
-    dcCreator:      {missing:true, flags:[{type:'missing',dim:'Attributional'}]},
-    dctermsCreated: {value:'1960s', flags:[{type:'incomplete',dim:'Temporal',note:'Decade-level dating only.'}], termCluster:'century-contested'},
-    edmCountry:     {value:'England', flags:[{type:'inconsistent',dim:'Spatial'}], termCluster:'uk-coverage'},
-    dcType:         {value:'photograph', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
-  }},
-  { id:1276, title:'Campfire Scene, Yorkshire Moors', thumbnail:null, fields:{
-    dcTitle:        {value:'Campfire Scene, Yorkshire Moors', flags:[]},
-    dcDescription:  {value:'A family gathered around a campfire on open moorland. Location unconfirmed.', flags:[{type:'incomplete',dim:'Textual',note:'Location described as "unconfirmed".'}]},
-    dcSubject:      {value:'Family life; Outdoor life; Campfires', flags:[]},
-    dcCreator:      {value:'Bert Hardy', flags:[]},
-    dctermsCreated: {value:'1967', flags:[]},
-    edmCountry:     {value:'UK', flags:[{type:'inconsistent',dim:'Spatial'}], termCluster:'uk-coverage'},
-    dcType:         {value:'still image', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
-  }},
-  { id:1277, title:'Horse Fair, Appleby', thumbnail:null, fields:{
-    dcTitle:        {value:'Horse Fair, Appleby', flags:[]},
-    dcDescription:  {value:'<span class="contested-word" title="Contested">Gypsies</span> and <span class="contested-word" title="Contested">Travellers</span> at Appleby New Fair.', flags:[{type:'contested',dim:'Textual'}], termCluster:'gypsy-terminology'},
-    dcSubject:      {value:'Horse fairs; Romani culture; Appleby', flags:[]},
-    dcCreator:      {missing:true, flags:[{type:'missing',dim:'Attributional'}]},
-    dctermsCreated: {value:'c. 1965', flags:[{type:'incomplete',dim:'Temporal',note:'"circa" indicates approximate date.'}], termCluster:'century-contested'},
-    edmCountry:     {value:'England', flags:[{type:'inconsistent',dim:'Spatial'}], termCluster:'uk-coverage'},
-    dcType:         {value:'photograph', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
-  }},
-  { id:1278, title:'Portrait of an Elder', thumbnail:null, fields:{
-    dcTitle:        {value:'Portrait of an Elder', flags:[{type:'incomplete',dim:'Textual',note:'Subject identity unrecorded.'}]},
-    dcDescription:  {value:'Close-up portrait of an elderly man, believed to be of Romani descent.', flags:[{type:'incomplete',dim:'Textual',note:'Relies on uncertain inference.'}]},
-    dcSubject:      {missing:true, flags:[{type:'missing',dim:'Textual'}]},
-    dcCreator:      {missing:true, flags:[{type:'missing',dim:'Attributional'}]},
-    dctermsCreated: {missing:true, flags:[{type:'missing',dim:'Temporal'}]},
-    edmCountry:     {value:'United Kingdom', flags:[]},
-    dcType:         {value:'image', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
-  }},
-  { id:1279, title:'Vardo by Roadside', thumbnail:null, fields:{
-    dcTitle:        {value:'Vardo by Roadside', flags:[]},
-    dcDescription:  {value:'Traditional painted wooden wagon (vardo) parked along a country road.', flags:[]},
-    dcSubject:      {value:'Vardos; Romani material culture; Caravans', flags:[]},
-    dcCreator:      {value:'Homer Sykes', flags:[]},
-    dctermsCreated: {value:'1972', flags:[]},
-    edmCountry:     {value:'England', flags:[{type:'inconsistent',dim:'Spatial'}], termCluster:'uk-coverage'},
-    dcType:         {value:'photograph', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
-  }},
-  { id:1280, title:'Roadside Camp, Kent', thumbnail:null, fields:{
-    dcTitle:        {value:'Roadside Camp, Kent', flags:[]},
-    dcDescription:  {value:'Informal roadside encampment with several vehicles and caravans. Kent, 1968.', flags:[]},
-    dcSubject:      {value:'Encampments; Rural life; Mobile communities', flags:[]},
-    dcCreator:      {value:'Tom Picton', flags:[]},
-    dctermsCreated: {value:'1968', flags:[]},
-    edmCountry:     {value:'England', flags:[]},
-    dcType:         {value:'still image', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
-  }},
-  { id:1281, title:'Gypsy Caravan', thumbnail:null, fields:{
-    dcTitle:        {value:'<span class="contested-word" title="\'Gypsy\' is contested">Gypsy</span> Caravan', flags:[{type:'contested',dim:'Textual'}], termCluster:'gypsy-terminology'},
-    dcDescription:  {value:'A painted wooden caravan parked in a field. Same object as record 1274.', flags:[{type:'inconsistent',dim:'Textual',note:'Duplicate of record 1274 with different title terminology.'}]},
-    dcSubject:      {value:'Caravans; Romani culture', flags:[]},
-    dcCreator:      {value:'www.wikidata.org', flags:[{type:'incomplete',dim:'Attributional',note:'Generic Wikidata URI.'}]},
-    dctermsCreated: {value:'20th Century', flags:[{type:'incomplete',dim:'Temporal'}], termCluster:'century-contested'},
-    edmCountry:     {value:'England', flags:[{type:'inconsistent',dim:'Spatial'}], termCluster:'uk-coverage'},
-    dcType:         {value:'image', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
-  }},
-  { id:1282, title:'Winter Camp, Dartmoor', thumbnail:null, fields:{
-    dcTitle:        {value:'Winter Camp, Dartmoor', flags:[]},
-    dcDescription:  {value:'Encampment on Dartmoor in winter conditions. No information on the community present.', flags:[{type:'incomplete',dim:'Textual',note:'Description lacks cultural context.'}]},
-    dcSubject:      {missing:true, flags:[{type:'missing',dim:'Textual'}]},
-    dcCreator:      {value:'Unknown', flags:[{type:'incomplete',dim:'Attributional',note:'"Unknown" effectively missing.'}]},
-    dctermsCreated: {value:'1960–1970', flags:[{type:'incomplete',dim:'Temporal',note:'Decade range only.'}], termCluster:'century-contested'},
-    edmCountry:     {value:'England', flags:[]},
-    dcType:         {value:'photograph', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
-  }},
-  { id:1283, title:'Smithy at Roadside', thumbnail:null, fields:{
-    dcTitle:        {value:'Smithy at Roadside', flags:[]},
-    dcDescription:  {value:'A travelling smith working at a portable forge. Location: Lincolnshire.', flags:[]},
-    dcSubject:      {value:'Blacksmithing; Travelling trades; Rural crafts', flags:[]},
-    dcCreator:      {value:'Chris Steele-Perkins', flags:[]},
-    dctermsCreated: {value:'1974', flags:[]},
-    edmCountry:     {value:'England', flags:[]},
-    dcType:         {value:'photograph', flags:[{type:'inconsistent',dim:'Attributional'}], termCluster:'photographic-type'},
-  }},
-];
+// Filled from the loaded collection by loadCollection() (see js/v3-adapter.js)
+let TERM_CLUSTERS = {};
+let RECORDS = [];
 </script>
 
 <!-- ─── HTML ──────────────────────────────────────────────────────────────── -->
@@ -681,8 +610,14 @@ const RECORDS = [
   <!-- Topbar -->
   <div id="topbar">
     <div id="topbar-logo">MapGaps</div>
-    <div id="topbar-collection">Europeana · Romani &amp; Traveller Communities in Britain · 10 records</div>
+    <div id="topbar-collection">Loading collection…</div>
     <div id="topbar-spacer"></div>
+    <span id="upload-status" role="status"></span>
+    <label id="topbar-upload" for="upload-input" title="Europeana Record API or Search API JSON, or a CSV with dcTitle, dcDescription, dcSubject, dcCreator, dctermsCreated, edmCountry, dcType columns">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5.5 8V1.5M2.8 4.2 5.5 1.5l2.7 2.7M1.5 9.5h8"/></svg>
+      Upload collection
+    </label>
+    <input type="file" id="upload-input" accept=".json,.csv,application/json,text/csv" hidden>
     <div id="topbar-search">
       <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="4.5" cy="4.5" r="3"/><line x1="7" y1="7" x2="10" y2="10"/></svg>
       <input id="search-input" type="text" placeholder="Search records…" autocomplete="off">
@@ -851,6 +786,14 @@ const RECORDS = [
   </div>
 </div>
 
+<!-- ─── ENGINE: taxonomy rules, word lists, default collection, analysis ──── -->
+<script src="data/taxonomy.js"></script>
+<script src="data/vocabulary.js"></script>
+<script src="data/collection-2024904.js"></script>
+<script src="js/analysis.js"></script>
+<script src="js/io.js"></script>
+<script src="js/v3-adapter.js"></script>
+
 <!-- ─── APP LOGIC ─────────────────────────────────────────────────────────── -->
 <script>
 (function () {
@@ -866,6 +809,24 @@ const RECORDS = [
     detailDimTab:   'all',
     searchQuery:    '',
   };
+
+  const esc = MapGapsV3Adapter.esc;
+  // Record ids without the prefix every record in the collection shares
+  let idPrefix = '';
+  const lastSegment = id => String(id).split('/').pop();
+  const shortId = id => lastSegment(id).slice(idPrefix.length) || lastSegment(id);
+  function sharedIdPrefix(ids) {
+    if (ids.length < 2) return '';
+    let prefix = lastSegment(ids[0]);
+    for (const id of ids) {
+      const seg = lastSegment(id);
+      let i = 0;
+      while (i < prefix.length && prefix[i] === seg[i]) i++;
+      prefix = prefix.slice(0, i);
+    }
+    const cut = Math.max(prefix.lastIndexOf('_'), prefix.lastIndexOf('-'), prefix.lastIndexOf('.'));
+    return cut >= 0 ? prefix.slice(0, cut + 1) : '';
+  }
 
   // ── DOM ───────────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
@@ -986,23 +947,6 @@ const RECORDS = [
 
   // ── Analytics ─────────────────────────────────────────────────────────────
 
-  // For a given attr, count ALL flags — no filters applied
-  function attrFlagCountsAll(attrKey) {
-    const counts = { incomplete:0, inconsistent:0, contested:0, missing:0 };
-    for (const rec of RECORDS) {
-      const field = rec.fields[attrKey];
-      if (!field) continue;
-      if (field.missing) {
-        counts.missing++;
-      } else if (field.flags) {
-        for (const flag of field.flags) {
-          counts[flag.type] = (counts[flag.type] || 0) + 1;
-        }
-      }
-    }
-    return counts;
-  }
-
   // How many records have any flag for this attr (unfiltered)
   function attrFlaggedRecordCount(attrKey) {
     let n = 0;
@@ -1090,9 +1034,10 @@ const RECORDS = [
       if (!issueActive) {
         // ── Overview mode: single bar, % of total records flagged ──
         const flaggedN   = attrFlaggedRecordCount(key);
-        const allCounts  = attrFlagCountsAll(key);
-        const uncertainN = allCounts.incomplete + allCounts.inconsistent + allCounts.contested;
-        const missingN   = allCounts.missing;
+        // records, not flags: a field can carry several flags
+        const uncertainN = RECORDS.filter(r => { const f = r.fields[key]; return f && !f.missing && f.flags && f.flags.length > 0; }).length;
+        const missingN   = RECORDS.filter(r => { const f = r.fields[key]; return f && f.missing; }).length;
+        row.title = `${ATTR_LABELS[key]}: ${uncertainN} of ${N} records uncertain, ${missingN} absent`;
 
         if (flaggedN === 0) {
           const empty = document.createElement('div');
@@ -1251,8 +1196,8 @@ const RECORDS = [
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1"><rect x="1" y="1" width="10" height="10" rx="1"/><path d="M1 8l3-3 2 2 2-2.5 3 3.5"/></svg>
         </div>
         <div class="record-meta">
-          <span class="record-id">${rec.id}</span>
-          <span class="record-title">${rec.title}</span>
+          <span class="record-id" title="${esc(rec.id)}">${esc(shortId(rec.id))}</span>
+          <span class="record-title">${esc(rec.title)}</span>
           <div class="record-pills">${types.map(t => `<span class="pill ${t}">${t === 'missing' ? 'absent' : t}</span>`).join('')}</div>
         </div>
       `;
@@ -1272,7 +1217,7 @@ const RECORDS = [
     fieldCardsWrap.hidden = false;
 
     detailTitle.textContent = rec.title;
-    detailSub.textContent   = `Record ${rec.id}`;
+    detailSub.innerHTML = `Record ${esc(rec.id)}${rec.link ? ` · <a href="${esc(rec.link)}" target="_blank" rel="noopener">View on Europeana ↗</a>` : ''}`;
 
     const activeTab = state.detailDimTab;
     detailHeader.querySelectorAll('.dim-tab').forEach(t => {
@@ -1304,7 +1249,7 @@ const RECORDS = [
         if (field.termCluster) {
           grid.appendChild(makeTermCard(key, field));
         } else if (field.missing) {
-          grid.appendChild(makeMissingCard(key));
+          grid.appendChild(makeMissingCard(key, field));
         } else {
           grid.appendChild(makeFieldCard(key, field));
         }
@@ -1322,19 +1267,37 @@ const RECORDS = [
       <div class="field-card-key">${key}</div>
       <div class="field-card-label">${ATTR_LABELS[key]}</div>
       <div class="field-card-value">${field.value}</div>
-      ${hasFl ? `<div class="card-tags">${field.flags.map(f => `<span class="nature-tag ${f.type}">${f.type === 'missing' ? 'absent' : f.type}</span>`).join('')}</div>` : ''}
+      ${flagTags(field)}
+      ${infoLine(field)}
     `;
     return card;
   }
 
-  function makeMissingCard(key) {
+  // One tag per type; hovering it lists the taxonomy rules and reasons behind it
+  function flagTags(field) {
+    if (!field.flags || !field.flags.length) return '';
+    const byType = new Map();
+    for (const f of field.flags) {
+      if (!byType.has(f.type)) byType.set(f.type, []);
+      if (f.note) byType.get(f.type).push(f.note);
+    }
+    return `<div class="card-tags">${[...byType].map(([t, notes]) =>
+      `<span class="nature-tag ${t}" title="${esc(notes.join('\n'))}">${t === 'missing' ? 'absent' : t}${notes.length > 1 ? ` ×${notes.length}` : ''}</span>`).join('')}</div>`;
+  }
+  function infoLine(field) {
+    return field.info && field.info.length
+      ? `<div class="field-card-info" title="${esc(field.info.join('\n'))}">${esc(field.info[0])}${field.info.length > 1 ? ` (+${field.info.length - 1})` : ''}</div>` : '';
+  }
+
+  function makeMissingCard(key, field) {
     const card = document.createElement('div');
     card.className = 'field-card missing';
     card.innerHTML = `
       <div class="field-card-key">${key}</div>
       <div class="field-card-label">${ATTR_LABELS[key]}</div>
       <div class="field-card-value">—</div>
-      <div class="card-tags"><span class="nature-tag missing">absent</span></div>
+      <div class="card-tags"><span class="nature-tag missing" title="${esc(((field && field.flags) || []).map(f => f.note).filter(Boolean).join('\n'))}">absent</span></div>
+      ${field ? infoLine(field) : ''}
     `;
     return card;
   }
@@ -1356,8 +1319,11 @@ const RECORDS = [
     card.className = `term-card ${cardCls}`;
     card.innerHTML = `
       <div class="term-card-key">${key}</div>
-      <div class="term-card-label">${cluster.name}</div>
-      <div class="term-card-tags">${cluster.terms.slice(0,3).map(t => `<span class="nature-tag ${t.type}">${t.value}</span>`).join('')}${cluster.terms.length > 3 ? `<span class="nature-tag inconsistent">+${cluster.terms.length-3}</span>` : ''}</div>
+      <div class="term-card-label">${ATTR_LABELS[key]} · ${esc(cluster.name)}</div>
+      <div class="field-card-value">${field.value}</div>
+      <div class="term-card-tags">${cluster.terms.slice(0,3).map(t => `<span class="nature-tag ${t.type}">${esc(t.value)}</span>`).join('')}${cluster.terms.length > 3 ? `<span class="nature-tag inconsistent">+${cluster.terms.length-3}</span>` : ''}</div>
+      ${flagTags(field)}
+      ${infoLine(field)}
     `;
     card.addEventListener('click', () => openModal(field.termCluster));
     return card;
@@ -1375,10 +1341,12 @@ const RECORDS = [
     callout.textContent = mode === 'contested'
       ? 'This cluster contains contested terminology. Resolution requires community review and cannot be aligned automatically.'
       : 'This cluster contains inconsistent terminology variants that can be aligned to a preferred form.';
-    $('modal-term-chips').innerHTML = cl.terms.map(t => `<span class="term-chip ${t.type}">${t.value}</span>`).join('');
+    $('modal-term-chips').innerHTML = cl.terms.map(t =>
+      `<span class="term-chip ${t.type}" title="${t.count} occurrence${t.count === 1 ? '' : 's'}${t.preferred ? ' · reference term' : ''}">${esc(t.value)} <b>${t.count}</b>${t.preferred ? ' ★' : ''}</span>`).join('');
+    if (cl.note) callout.textContent += ' ' + cl.note;
     $('modal-record-list').innerHTML = cl.records.map(rid => {
       const rec = RECORDS.find(r => r.id === rid);
-      return rec ? `<div class="modal-record-item"><span class="rid">${rid}</span><span class="rtitle">${rec.title}</span><span class="rbadge ${mode}">${mode}</span></div>` : '';
+      return rec ? `<button type="button" class="modal-record-item" data-rid="${esc(rid)}"><span class="rid">${esc(shortId(rid))}</span><span class="rtitle">${esc(rec.title)}</span><span class="rbadge ${mode}">${mode}</span></button>` : '';
     }).join('');
     $('modal-align-btn').hidden = mode !== 'inconsistent';
     $('modal-flag-btn').hidden  = mode !== 'contested';
@@ -1407,9 +1375,58 @@ const RECORDS = [
     if (rec) renderFieldCards(rec);
   }
 
+  // ── Loading a collection ──────────────────────────────────────────────────
+  // Runs the taxonomy engine over the records and refills RECORDS / TERM_CLUSTERS.
+  function loadCollection(input, sourceName) {
+    const analysis = MapGapsAnalysis.analyse(input, { taxonomy: MAPGAPS_TAXONOMY, vocabulary: MAPGAPS_VOCABULARY || {} });
+    const v3 = MapGapsV3Adapter.toV3(analysis, MapGapsAnalysis);
+    RECORDS = v3.records;
+    TERM_CLUSTERS = v3.clusters;
+    idPrefix = sharedIdPrefix(RECORDS.map(r => r.id));
+    state.selectedRecord = null;
+    modalOverlay.hidden = true;
+    rightEmpty.hidden = false;
+    detailHeader.hidden = true;
+    fieldCardsWrap.hidden = true;
+    $('topbar-collection').textContent =
+      ['Europeana', v3.provider, v3.collection || sourceName, `${RECORDS.length} records`].filter(Boolean).join(' · ');
+    $('topbar-collection').title = sourceName || '';
+    onFilterChange();
+  }
+
+  const uploadStatus = $('upload-status');
+  $('upload-input').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    uploadStatus.className = '';
+    uploadStatus.textContent = `Reading ${file.name}…`;
+    try {
+      const rows = MapGapsIO.parseFile(file.name, await file.text());
+      if (!rows.length) throw new Error('No records found in the file.');
+      loadCollection(rows, file.name);
+      uploadStatus.textContent = `Loaded ${rows.length} records`;
+      setTimeout(() => { if (uploadStatus.textContent.startsWith('Loaded')) uploadStatus.textContent = ''; }, 4000);
+    } catch (err) {
+      uploadStatus.className = 'error';
+      uploadStatus.textContent = `Could not load ${file.name}: ${err.message} Use a Europeana Record/Search API JSON export or a CSV with Dublin Core columns.`;
+    }
+  });
+
+  // Records listed in the term-cluster pop-up open in the detail panel
+  $('modal-record-list').addEventListener('click', e => {
+    const item = e.target.closest('.modal-record-item');
+    const rec = item && RECORDS.find(r => r.id === item.dataset.rid);
+    if (!rec) return;
+    modalOverlay.hidden = true;
+    state.selectedRecord = rec.id;
+    renderRecordList();
+    renderFieldCards(rec);
+  });
+
   // ── Init ──────────────────────────────────────────────────────────────────
   updateAllDropdownUIs();
-  onFilterChange();
+  loadCollection(window.MAPGAPS_COLLECTION || [], 'collection 2024904');
 
 })();
 </script>

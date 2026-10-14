@@ -250,11 +250,18 @@
     };
   }
 
-  /** Europeana Record API object (`object` of /record/v2/{id}.json): provider vs Europeana proxy. */
+  /**
+   * Europeana Record API object (`object` of /record/v2/{id}.json): provider vs Europeana proxy.
+   * Every non-Europeana proxy counts as provider data (some records carry an extra
+   * aggregator proxy). Provider values that point at an entity described in the record
+   * (Wikidata agent, Getty AAT concept, ...) are shown by that entity's label; the
+   * address is kept in `record.links` so the page can link to it.
+   */
   function fromRecordApi(input) {
     const o = input.object || input;
     const record = emptyRecord();
-    const providerProxy = o.proxies.find((p) => !p.europeanaProxy) || o.proxies[0];
+    record.links = {};
+    const providerProxies = o.proxies.filter((p) => !p.europeanaProxy);
     const europeanaProxy = o.proxies.find((p) => p.europeanaProxy);
     const labels = new Map();
     for (const kind of ['agents', 'places', 'timespans', 'concepts', 'organizations']) {
@@ -265,26 +272,28 @@
       }
     }
     const proxyKeys = { dcCoverage: ['dcCoverage', 'dctermsSpatial'] };
-    const read = (proxy, field, resolve) => {
-      if (!proxy) return [];
-      const values = uniq((proxyKeys[field] || [field]).flatMap((k) => langValues(proxy[k])));
-      return resolve ? uniq(values.map((v) => labels.get(v) || v)) : values;
-    };
+    const read = (proxies, field) => uniq(proxies.flatMap((proxy) =>
+      (proxyKeys[field] || [field]).flatMap((k) => langValues(proxy[k]))));
     record.target = {};
     for (const f of FIELDS) {
       if (f.key === 'edmCountry') continue;
-      record.values[f.key] = read(providerProxy, f.key, false);
-      record.target[f.key] = read(europeanaProxy, f.key, true);
+      const raw = read(providerProxies, f.key);
+      record.values[f.key] = uniq(raw.map((v) => labels.get(v) || v));
+      const linked = raw.filter((v) => labels.has(v)).map((v) => ({ label: labels.get(v), uri: v }));
+      if (linked.length) record.links[f.key] = linked;
+      record.target[f.key] = uniq(read(europeanaProxy ? [europeanaProxy] : [], f.key).map((v) => labels.get(v) || v));
     }
     const country = langValues(o.europeanaAggregation && o.europeanaAggregation.edmCountry);
     record.values.edmCountry = country;
     record.target.edmCountry = country;
     record.year = uniq([...langValues(europeanaProxy && europeanaProxy.year), ...langValues(o.year)]);
     record.id = text(o.about);
-    record.identifier = langValues(providerProxy.dcIdentifier);
+    record.identifier = uniq(providerProxies.flatMap((p) => langValues(p.dcIdentifier)));
     record.sameAs = langValues((o.providedCHOs || []).map((c) => c.owlSameAs));
     record.provider = text(langValues((o.aggregations || []).map((a) => a.edmDataProvider))[0]);
+    record.provider = labels.get(record.provider) || record.provider;
     record.link = text((o.europeanaAggregation && o.europeanaAggregation.edmLandingPage) || '');
+    record.collection = text(langValues(o.edmDatasetName)[0] || langValues(o.europeanaCollectionName)[0]);
     return record;
   }
 
@@ -342,7 +351,9 @@
   function normaliseRecords(rows) {
     return rows.map((row) => {
       if (row && (row.proxies || (row.object && row.object.proxies))) return fromRecordApi(row);
-      if (row && (Object.keys(row).some((k) => /LangAware$|^edm[A-Z]/.test(k)) || Array.isArray(row.title))) return fromSearchItem(row);
+      // Search API items use LangAware maps and array-valued title / dataProvider; flat rows
+      // (CSV, simple JSON) may also have edm* columns, so those alone do not decide it
+      if (row && (Object.keys(row).some((k) => /LangAware$/.test(k)) || Array.isArray(row.title) || Array.isArray(row.dataProvider))) return fromSearchItem(row);
       return fromRow(row);
     }).map((r, i) => {
       // "dctermsCreated / year": Europeana's normalised year stands in when dctermsCreated is empty
@@ -680,10 +691,10 @@
           if (/(\.\.\.|…)$/.test(v)) reason = 'Entry is cut off ("…")';
           else if (/[-–/(,&]$/.test(v)) reason = 'Entry ends mid-phrase';
           else if ((v.match(/\(/g) || []).length > (v.match(/\)/g) || []).length || (v.match(/"/g) || []).length % 2) reason = 'Unclosed bracket or quote: the entry looks truncated';
-          else if (v.replace(/[^\p{L}]/gu, '').length <= 2) reason = 'Entry is only one or two letters';
+          else if (v.replace(/[^\p{L}]/gu, '').length <= 2 && !isCountryOnly(ctx, v)) reason = 'Entry is only one or two letters';
           else if (v.length === 255 || v.length === 256) reason = 'Entry stops exactly at a field-length limit';
           else if (/^\p{L}{1,5}\.$/u.test(v)) reason = 'Entry is an abbreviation';
-          const vague = !reason && vagueReason(record, field, v);
+          const vague = !reason && (field === 'dcTitle' || field === 'dcDescription') && vagueReason(record, field, v);
           if (vague) flag(record, 'EXT-UI-LING-INCOM', field, i, { reason: `Vague / non-descriptive: ${vague}`, vague: true });
           else if (reason) flag(record, 'EXT-UI-LING-INCOM', field, i, { reason });
         }
