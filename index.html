@@ -517,6 +517,20 @@ button.modal-record-item { border: none; width: 100%; text-align: left; cursor: 
 button.modal-record-item:hover { background: var(--bg-hover); }
 #detail-sub a { color: var(--blue-sel); }
 
+#detail-back {
+  display: block; margin-bottom: 6px; padding: 0; border: none; background: none;
+  font-size: 10px; color: var(--blue-sel); cursor: pointer; text-decoration: underline; font-family: var(--font-ui);
+}
+.attr-view-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.attr-view-record {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  padding-bottom: 5px; margin-bottom: 3px; border-bottom: 0.5px solid var(--border);
+}
+.attr-view-record .record-id { font-family: var(--font-mono); font-size: 9px; color: var(--fg-3); }
+.attr-view-title { font-size: 11px; font-weight: 600; color: var(--fg); flex: 1; min-width: 0; }
+.attr-view-record .seg-clear { padding: 0; }
+.bar-row-label { cursor: pointer; }
+
 /* Modal */
 #modal-overlay {
   position: fixed; inset: 0; background: var(--modal-overlay);
@@ -764,6 +778,7 @@ let RECORDS = [];
           <p><strong>Select a record to inspect it</strong>Click a record in the list to see its field-level flags. Use the filters above to narrow the selection.</p>
         </div>
         <div id="detail-header" hidden>
+          <button type="button" id="detail-back" hidden></button>
           <div id="detail-title"></div>
           <div id="detail-sub"></div>
           <div id="detail-dim-tabs">
@@ -821,7 +836,6 @@ let RECORDS = [];
     dims:           new Set(),   // selected dimensions (empty = all)
     attrs:          new Set(),   // selected attribute keys for filtering (empty = all)
     issues:         new Set(),   // selected issue types (empty = all)
-    highlightedBar: null,        // key of bar row highlighted by clicking the chart
     segment:        null,        // clicked bar part {attr, kind}: lists those records below
     selectedRecord: null,
     detailDimTab:   'all',
@@ -957,10 +971,11 @@ let RECORDS = [];
   });
 
   // ── Highlight a bar row by clicking it (independent from attr filter) ──────
+  // Clicking an attribute in the chart lists the records flagged in it and shows
+  // only that attribute of each; clicking it again clears the selection.
   function toggleAttrFromBar(attrKey) {
-    // Clicking the same bar again deselects it
-    state.highlightedBar = state.highlightedBar === attrKey ? null : attrKey;
-    renderBarChart(); // just re-render highlights, no filter change needed
+    const same = state.segment && state.segment.attr === attrKey && state.segment.kind === 'flagged';
+    selectSegment(same ? null : { attr: attrKey, kind: 'flagged' });
   }
 
   // ── Bar parts → records ───────────────────────────────────────────────────
@@ -969,11 +984,17 @@ let RECORDS = [];
     const f = rec.fields[attr];
     if (!f) return false;
     if (kind === 'absent') return Boolean(f.missing);
+    if (kind === 'flagged' && f.missing) return state.issues.size === 0;
     if (f.missing || !f.flags) return false;
     if (kind === 'uncertain') return f.flags.length > 0;
+    if (kind === 'flagged') return state.issues.size > 0
+      ? f.flags.some(fl => state.issues.has(fl.type))
+      : f.flags.length > 0;
     return f.flags.some(fl => fl.type === kind);
   }
-  const KIND_LABEL = k => (k === 'uncertain' || k === 'absent' ? k : typeName(k));
+  const KIND_LABEL = k => (k === 'uncertain' || k === 'absent' ? k
+    : k === 'flagged' ? (state.issues.size ? [...state.issues].map(typeName).join(' / ') : 'uncertain or absent')
+    : typeName(k));
 
   function makeClickable(seg, attr, kind, n) {
     const picked = state.segment && state.segment.attr === attr && state.segment.kind === kind;
@@ -986,17 +1007,28 @@ let RECORDS = [];
       (picked ? 'Click again to show all records' : 'Click to list these records below');
     const pick = e => {
       e.stopPropagation();
-      state.segment = picked ? null : { attr, kind };
-      renderBarChart();
-      renderRecordList();
-      const first = state.segment && RECORDS.find(r => r.id === state.selectedRecord && inSegment(r, attr, kind))
-        || (state.segment && sortedSegmentRecords()[0]);
-      if (first) { state.selectedRecord = first.id; renderRecordList(); renderFieldCards(first); }
-      else if (!state.segment) { const rec = RECORDS.find(r => r.id === state.selectedRecord); if (rec) renderFieldCards(rec); }
-      $('record-list-wrap').scrollTop = 0;
+      selectSegment(picked ? null : { attr, kind });
     };
     seg.addEventListener('click', pick);
     seg.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } });
+  }
+
+  // Apply (or clear) a chart selection: the list shows its records, the right panel
+  // shows only the selected attribute of each of them.
+  function selectSegment(segment) {
+    state.segment = segment;
+    state.selectedRecord = null;
+    renderBarChart();
+    renderRecordList();
+    $('record-list-wrap').scrollTop = 0;
+    if (state.segment) renderAttributeView();
+    else showEmptyDetail();
+  }
+
+  function showEmptyDetail() {
+    rightEmpty.hidden = false;
+    detailHeader.hidden = true;
+    fieldCardsWrap.hidden = true;
   }
 
   function sortedSegmentRecords() {
@@ -1007,13 +1039,7 @@ let RECORDS = [];
       .sort((a, b) => totalFlagsForRecord(b) - totalFlagsForRecord(a));
   }
 
-  $('seg-clear').addEventListener('click', () => {
-    state.segment = null;
-    renderBarChart();
-    renderRecordList();
-    const rec = RECORDS.find(r => r.id === state.selectedRecord);
-    if (rec) renderFieldCards(rec);
-  });
+  $('seg-clear').addEventListener('click', () => selectSegment(null));
 
   // ── Analytics ─────────────────────────────────────────────────────────────
 
@@ -1079,7 +1105,7 @@ let RECORDS = [];
 
     for (const key of attrs) {
       // Bar highlighting comes from clicking the bar, not from the attr filter
-      const isHighlighted = state.highlightedBar === key;
+      const isHighlighted = Boolean(state.segment && state.segment.attr === key);
 
       const row = document.createElement('div');
       row.className = 'bar-row' + (isHighlighted ? ' selected' : '');
@@ -1219,7 +1245,8 @@ let RECORDS = [];
   function recordFlagSummary(rec) {
     const types = new Set();
     let missing = false;
-    for (const field of Object.values(rec.fields)) {
+    for (const [key, field] of Object.entries(rec.fields)) {
+      if (state.segment && key !== state.segment.attr) continue;
       if (field.missing) missing = true;
       if (field.flags) for (const f of field.flags) types.add(f.type);
     }
@@ -1278,20 +1305,68 @@ let RECORDS = [];
           <div class="record-pills">${types.map(t => `<span class="pill ${t}">${typeName(t)}</span>`).join('')}</div>
         </div>
       `;
-      row.addEventListener('click', () => {
-        state.selectedRecord = rec.id;
-        renderRecordList();
-        renderFieldCards(rec);
-      });
+      row.addEventListener('click', () => openRecord(rec));
       recordList.appendChild(row);
     }
   }
 
   // ── Field cards ───────────────────────────────────────────────────────────
+  // Only the selected attribute, for every record in the chart selection
+  function renderAttributeView() {
+    const { attr, kind } = state.segment;
+    const recs = sortedSegmentRecords();
+    rightEmpty.hidden = true;
+    detailHeader.hidden = false;
+    fieldCardsWrap.hidden = false;
+    $('detail-back').hidden = true;
+    $('detail-dim-tabs').hidden = true;
+    detailTitle.textContent = `${ATTR_LABELS[attr]} · ${KIND_LABEL(kind)}`;
+    detailSub.innerHTML = `${attr} in ${recs.length} of ${RECORDS.length} records · only this attribute is shown · <button type="button" class="seg-clear" id="attr-view-clear">show all records</button>`;
+    $('attr-view-clear').addEventListener('click', () => selectSegment(null));
+
+    fieldCardsContent.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.className = 'cards-grid attr-view-grid';
+    for (const rec of recs) {
+      const field = rec.fields[attr];
+      const card = field.termCluster ? makeTermCard(attr, field)
+        : field.missing ? makeMissingCard(attr, field)
+        : makeFieldCard(attr, field);
+      card.classList.toggle('focus-card', rec.id === state.selectedRecord);
+      const head = document.createElement('div');
+      head.className = 'attr-view-record';
+      head.innerHTML = `<span class="record-id" title="${esc(rec.id)}">${esc(shortId(rec.id))}</span>
+        <span class="attr-view-title">${esc(rec.title)}</span>
+        <button type="button" class="seg-clear">open record</button>`;
+      head.querySelector('button').addEventListener('click', e => { e.stopPropagation(); openRecord(rec); });
+      card.prepend(head);
+      grid.appendChild(card);
+    }
+    if (!recs.length) grid.innerHTML = '<div class="bar-zero">No records match this selection.</div>';
+    fieldCardsContent.appendChild(grid);
+    fieldCardsWrap.scrollTop = 0;
+  }
+
+  // Whole record; while a chart selection is active a button leads back to it
+  function openRecord(rec) {
+    state.selectedRecord = rec.id;
+    renderRecordList();
+    renderFieldCards(rec);
+  }
+
+  $('detail-back').addEventListener('click', () => {
+    if (!state.segment) return;
+    renderRecordList();
+    renderAttributeView();
+  });
+
   function renderFieldCards(rec) {
     rightEmpty.hidden   = true;
     detailHeader.hidden = false;
     fieldCardsWrap.hidden = false;
+    $('detail-dim-tabs').hidden = false;
+    $('detail-back').hidden = !state.segment;
+    if (state.segment) $('detail-back').textContent = `← back to ${ATTR_LABELS[state.segment.attr]} · ${KIND_LABEL(state.segment.kind)}`;
 
     detailTitle.textContent = rec.title;
     detailSub.innerHTML = `Record ${esc(rec.id)}${rec.link ? ` · <a href="${esc(rec.link)}" target="_blank" rel="noopener">View on Europeana ↗</a>` : ''}`;
@@ -1443,12 +1518,14 @@ let RECORDS = [];
 
   // ── Master update ─────────────────────────────────────────────────────────
   function onFilterChange() {
+    const hadSegment = Boolean(state.segment);
     state.segment = null;
     renderFilterSummary();
     renderBarChart();
     renderRecordList();
     const rec = RECORDS.find(r => r.id === state.selectedRecord);
     if (rec) renderFieldCards(rec);
+    else if (hadSegment) showEmptyDetail();
   }
 
   // ── Loading a collection ──────────────────────────────────────────────────
