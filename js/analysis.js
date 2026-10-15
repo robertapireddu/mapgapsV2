@@ -951,16 +951,23 @@
       }
     }
 
-    // MISS-DATAC-*: a field present at the provider proxy is never carried to the Europeana proxy
+    // MISS-DATAC-*: a field present at the provider proxy is never carried to the Europeana proxy.
+    // The Europeana proxy holds only what Europeana adds (links to its vocabularies, normalised
+    // dates), not a copy of the provider's record. So only values Europeana could enrich count:
+    // free text it never enriches (title, description) and values the provider already gave
+    // as a link are skipped, otherwise every collection would be flagged.
+    const NEVER_ENRICHED = new Set(['dcTitle', 'dcDescription']);
+    const enrichable = (r, field) => !NEVER_ENRICHED.has(field) && liveValues(r, field)
+      .some(({ v }) => !isUrl(v) && !((r.links || {})[field] || []).some((l) => l.label === v));
     const withTarget = records.filter((r) => r.target);
     if (withTarget.length) {
       for (const ruleId of ['MISS-DATAC-ATTR', 'MISS-DATAC-LING']) {
         for (const field of fieldsOf(ruleId)) {
-          const present = withTarget.filter((r) => liveValues(r, field).length);
+          const present = withTarget.filter((r) => enrichable(r, field));
           const carried = withTarget.some((r) => (r.target[field] || []).length);
           if (carried || present.length / withTarget.length < 0.2) continue;
           for (const r of present) {
-            flag(r, ruleId, field, -1, { reason: `Filled for ${present.length} of ${withTarget.length} records at the provider proxy, but never carried to the Europeana proxy` });
+            flag(r, ruleId, field, -1, { reason: `Given as text in ${present.length} of ${withTarget.length} records at the provider proxy, but never linked or carried to the Europeana proxy` });
           }
         }
       }

@@ -40,6 +40,11 @@ Every record is flagged by the taxonomy engine (`js/analysis.js`, rules from
   reference term) and the records that use them; click a record to open it.
 - **Linked entities**: values given as Wikidata or Getty AAT links show the name stored in the
   record, and link to the entity.
+- **Fields missing from the Europeana proxy** (`MISS - DATAC - ATTR`, `MISS - DATAC - LING`):
+  the Europeana proxy holds only what Europeana adds (vocabulary links, normalised dates), not
+  a copy of the record. These rules therefore count only values Europeana could enrich. Titles,
+  descriptions, and creators the provider already gave as a link are not flagged; a title that
+  is absent from the Europeana proxy still shows on the Europeana page.
 - **Proxy notes**: findings that come from comparing the provider and Europeana proxies, such as a
   field that never reaches the Europeana proxy, appear as notes under the field.
 

@@ -142,7 +142,8 @@ test('data-conversion rules compare the provider and Europeana proxies', () => {
   assert.ok(has(r, 'EXT-DATAC-SPA-INCOM', 'dcCoverage'));
   assert.ok(has(r, 'EXT-DATAC-LING-INCOM', 'dcSubject'));
   assert.ok(has(r, 'MISS-DATAC-ATTR', 'dcContributor'));
-  assert.ok(has(r, 'MISS-DATAC-LING', 'dcTitle'));
+  // Europeana never enriches titles, so a title missing from the Europeana proxy is not a gap
+  assert.ok(!has(r, 'MISS-DATAC-LING', 'dcTitle'));
 });
 
 test('vague or non-descriptive titles and descriptions', () => {
@@ -177,6 +178,17 @@ test('Europeana Search API items and CSV rows are mapped onto Europeana fields',
   assert.deepEqual(row.values.dcSubject, ['Roma', 'Gypsy']);
   assert.deepEqual(row.values.dcCoverage, ['UK']);
   assert.deepEqual(row.target.dcDate, ['1880']);
+});
+
+test('MISS-DATAC skips creators the provider already gave as a link', () => {
+  const rec = (n, creator) => ({
+    about: `/1/${n}`,
+    proxies: [{ europeanaProxy: false, dcCreator: { def: [creator] } }, { europeanaProxy: true }],
+    agents: [{ about: 'http://www.wikidata.org/entity/Q1', prefLabel: { en: ['John Topham'] } }],
+  });
+  const { records } = run([rec(1, 'http://www.wikidata.org/entity/Q1'), rec(2, 'Edith Hartley')]);
+  assert.ok(!has(records[0], 'MISS-DATAC-ATTR'), 'linked creator');
+  assert.ok(has(records[1], 'MISS-DATAC-ATTR', 'dcCreator'), 'creator given as plain text');
 });
 
 test('the sample collection exercises the taxonomy', () => {
