@@ -385,9 +385,20 @@ input  { font-family: inherit; }
 
 /* Left: record list */
 #left-panel {
-  width: 260px; flex-shrink: 0; display: flex; flex-direction: column;
-  border-right: 0.5px solid var(--border); background: var(--bg-panel); overflow: hidden;
+  width: 280px; flex-shrink: 0; display: flex; flex-direction: column;
+  border-left: 0.5px solid var(--border); background: var(--bg-panel); overflow: hidden;
 }
+#list-close {
+  border: none; background: none; color: var(--fg-3); font-size: 16px; line-height: 1;
+  padding: 0 2px; cursor: pointer;
+}
+#list-close:hover { color: var(--fg); }
+#view-all-records {
+  margin-left: auto; font-size: 11px; font-weight: 500; padding: 4px 11px; border-radius: var(--r);
+  border: 0.5px solid var(--blue-sel); background: var(--bg-panel); color: var(--blue-deep); cursor: pointer;
+}
+#view-all-records:hover { background: var(--bg-hover); }
+#view-all-records[aria-expanded="true"] { background: var(--blue-fill); }
 #list-header {
   padding: 8px 14px 7px; border-bottom: 0.5px solid var(--border);
   flex-shrink: 0; display: flex; align-items: center; gap: 6px;
@@ -601,7 +612,7 @@ button.modal-record-item:hover { background: var(--bg-hover); }
 }
 @media (max-width: 520px) {
   #bottom { flex-direction: column; }
-  #left-panel { width: 100%; height: 200px; border-right: none; border-bottom: 0.5px solid var(--border); }
+  #left-panel { width: 100%; height: 240px; border-left: none; border-top: 0.5px solid var(--border); }
 }
 </style>
 </head>
@@ -746,6 +757,7 @@ let RECORDS = [];
       </div>
 
       <button id="filter-reset">Reset all</button>
+      <button type="button" id="view-all-records" aria-expanded="false" aria-controls="left-panel">View all records</button>
 
     </div><!-- /filter-panel -->
 
@@ -764,24 +776,12 @@ let RECORDS = [];
     <!-- Bottom: record list + field cards -->
     <div id="bottom">
 
-      <div id="left-panel">
-        <div id="list-header">
-          <div id="list-context">All records</div>
-          <button type="button" id="seg-clear" class="seg-clear" hidden>show all</button>
-          <div id="list-count"></div>
-        </div>
-        <div id="record-list-wrap">
-          <div id="record-list-empty" hidden>No records match.</div>
-          <div id="record-list"></div>
-        </div>
-      </div>
-
       <div id="right-panel">
         <div id="right-empty">
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.1">
             <rect x="5" y="3" width="26" height="30" rx="3"/><line x1="10" y1="10" x2="26" y2="10"/><line x1="10" y1="16" x2="20" y2="16"/><line x1="10" y1="22" x2="18" y2="22"/>
           </svg>
-          <p><strong>Select a record to inspect it</strong>Click a record in the list to see its field-level flags. Use the filters above to narrow the selection.</p>
+          <p><strong>Click an attribute in the chart</strong>Click an attribute name, or one part of its bar, to see that attribute for the records flagged in it. To browse every record, use <em>View all records</em>.</p>
         </div>
         <div id="detail-header" hidden>
           <button type="button" id="detail-back" hidden></button>
@@ -799,6 +799,19 @@ let RECORDS = [];
           <div id="field-cards-content"></div>
         </div>
       </div>
+
+      <!-- All records: opens only from the "View all records" button -->
+      <aside id="left-panel" hidden aria-label="All records">
+        <div id="list-header">
+          <div id="list-context">All records</div>
+          <div id="list-count"></div>
+          <button type="button" id="list-close" aria-label="Close the record list">×</button>
+        </div>
+        <div id="record-list-wrap">
+          <div id="record-list-empty" hidden>No records match.</div>
+          <div id="record-list"></div>
+        </div>
+      </aside>
 
     </div>
   </div>
@@ -973,7 +986,9 @@ let RECORDS = [];
 
   searchInput.addEventListener('input', () => {
     state.searchQuery = searchInput.value.trim();
+    if (state.searchQuery && $('left-panel').hidden) setListOpen(true);
     renderRecordList();
+    if (state.segment) renderAttributeView();
   });
 
   // ── Highlight a bar row by clicking it (independent from attr filter) ──────
@@ -1022,7 +1037,7 @@ let RECORDS = [];
     seg.setAttribute('role', 'button');
     seg.setAttribute('aria-pressed', String(Boolean(picked)));
     seg.title = `${ATTR_LABELS[attr]} · ${KIND_LABEL(kind)}: ${n} of ${RECORDS.length} records (${Math.round(n / RECORDS.length * 100)}%)\n` +
-      (picked ? 'Click again to show all records' : 'Click to list these records below');
+      (picked ? 'Click again to clear the selection' : 'Click to see this attribute for these records below');
     const pick = e => {
       e.stopPropagation();
       selectSegment(picked ? null : { attr, kind });
@@ -1057,7 +1072,15 @@ let RECORDS = [];
       .sort((a, b) => totalFlagsForRecord(b) - totalFlagsForRecord(a));
   }
 
-  $('seg-clear').addEventListener('click', () => selectSegment(null));
+  // ── "View all records" panel ──────────────────────────────────────────────
+  function setListOpen(open) {
+    $('left-panel').hidden = !open;
+    $('view-all-records').setAttribute('aria-expanded', String(open));
+    $('view-all-records').textContent = open ? 'Hide all records' : 'View all records';
+    if (open) renderRecordList();
+  }
+  $('view-all-records').addEventListener('click', e => { e.stopPropagation(); setListOpen($('left-panel').hidden); });
+  $('list-close').addEventListener('click', () => setListOpen(false));
 
   // ── Analytics ─────────────────────────────────────────────────────────────
 
@@ -1256,7 +1279,6 @@ let RECORDS = [];
     const types = new Set();
     let missing = false;
     for (const [key, field] of Object.entries(rec.fields)) {
-      if (state.segment && key !== state.segment.attr) continue;
       if (state.attrs.size > 0 && !state.attrs.has(key)) continue;
       if (!dimApplies(key)) continue;
       if (fieldAbsent(field)) missing = true;
@@ -1276,17 +1298,14 @@ let RECORDS = [];
 
   function renderRecordList() {
     const hasAnyFilter = state.attrs.size > 0 || state.dims.size > 0 || state.issues.size > 0 || state.searchQuery;
-    const matching = state.segment ? sortedSegmentRecords() : RECORDS
+    const matching = RECORDS
       .filter(hasAnyFilter ? recordMatchesFilters : () => true)
       .sort((a,b) => totalFlagsForRecord(b) - totalFlagsForRecord(a));
 
     recordList.innerHTML = '';
     listCount.textContent = matching.length + ' / ' + RECORDS.length;
-    $('seg-clear').hidden = !state.segment;
 
-    if (state.segment) {
-      listContext.textContent = `${ATTR_LABELS[state.segment.attr]} · ${KIND_LABEL(state.segment.kind)} (from the chart)`;
-    } else if (hasAnyFilter) {
+    if (hasAnyFilter) {
       const parts = [];
       if (state.dims.size > 0)   parts.push([...state.dims].join(', '));
       if (state.attrs.size > 0)  parts.push([...state.attrs].map(k => ATTR_LABELS[k]).join(', '));
@@ -1332,7 +1351,7 @@ let RECORDS = [];
     $('detail-back').hidden = true;
     $('detail-dim-tabs').hidden = true;
     detailTitle.textContent = `${ATTR_LABELS[attr]} · ${KIND_LABEL(kind)}`;
-    detailSub.innerHTML = `${attr} in ${recs.length} of ${RECORDS.length} records · only this attribute is shown · <button type="button" class="seg-clear" id="attr-view-clear">show all records</button>`;
+    detailSub.innerHTML = `${attr} in ${recs.length} of ${RECORDS.length} records · only this attribute is shown · <button type="button" class="seg-clear" id="attr-view-clear">clear selection</button>`;
     $('attr-view-clear').addEventListener('click', () => selectSegment(null));
 
     fieldCardsContent.innerHTML = '';
