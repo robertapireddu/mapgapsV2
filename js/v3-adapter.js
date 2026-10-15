@@ -86,7 +86,10 @@
         if (r.derived && r.derived[key]) info.push('dctermsCreated is empty: value taken from Europeana\'s normalised year');
         if (!live.length) {
           const reason = r.values[key].length ? `Only a placeholder is recorded ("${r.values[key][0]}")` : 'Empty field';
-          fields[key] = { missing: true, flags: [{ type: 'missing', dim: ATTR_DIM[key], note: reason }], info };
+          // dimensions of the taxonomy's missing-field rules that flag this field (MISS-TEMP, MISS-SP, ...)
+          const dims = [...new Set(all.filter((f) => f.type === 'missing' && f.origin === 'Empty field').map((f) => DIM[f.dimension]).filter(Boolean))];
+          if (!dims.length) dims.push(ATTR_DIM[key]);
+          fields[key] = { missing: true, flags: [{ type: 'missing', dim: dims[0], dims, note: reason }], info };
           continue;
         }
         const seen = new Set();

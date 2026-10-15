@@ -531,6 +531,12 @@ button.modal-record-item:hover { background: var(--bg-hover); }
 .attr-view-record .seg-clear { padding: 0; }
 .bar-row-label { cursor: pointer; }
 
+.bar-row.na { cursor: default; opacity: 0.55; }
+.bar-row.na:hover { background: none; }
+.bar-na { font-size: 10px; font-style: italic; color: var(--fg-3); position: relative; z-index: 1; background: var(--bg-panel); padding-right: 6px; }
+.bar-row.na .bar-counts span { color: var(--fg-3); }
+.na-card { opacity: 0.45; }
+
 /* Modal */
 #modal-overlay {
   position: fixed; inset: 0; background: var(--modal-overlay);
@@ -978,19 +984,31 @@ let RECORDS = [];
     selectSegment(same ? null : { attr: attrKey, kind: 'flagged' });
   }
 
+  // ── Dimensions across attributes ──────────────────────────────────────────
+  // A dimension applies to an attribute when one of the taxonomy's rules for that
+  // dimension lists the attribute among its fields.
+  const TAX_DIM = { Temporal: 'temporal', Spatial: 'spatial', Textual: 'linguistic', Attributional: 'attributional' };
+  const DIM_FIELDS = Object.fromEntries(DIMENSIONS.map(d => [d,
+    new Set(MAPGAPS_TAXONOMY.rules.filter(r => r.dimension === TAX_DIM[d]).flatMap(r => r.fields))]));
+  const dimApplies = key => state.dims.size === 0 || [...state.dims].some(d => DIM_FIELDS[d].has(key));
+  const flagInDims = fl => state.dims.size === 0 || (fl.dims || [fl.dim]).some(d => state.dims.has(d));
+  const dimNames = () => DIMENSIONS.filter(d => state.dims.has(d)).join(' + ');
+  // field-level tests under the dimension filter
+  const fieldAbsent = f => Boolean(f && f.missing && f.flags.some(flagInDims));
+  const fieldUncertain = (f, pred = () => true) =>
+    Boolean(f && !f.missing && (f.flags || []).some(fl => fl.type !== 'missing' && flagInDims(fl) && pred(fl)));
+
   // ── Bar parts → records ───────────────────────────────────────────────────
   // kind: 'uncertain' | 'absent' | an uncertainty type ('incomplete', ...)
   function inSegment(rec, attr, kind) {
     const f = rec.fields[attr];
-    if (!f) return false;
-    if (kind === 'absent') return Boolean(f.missing);
-    if (kind === 'flagged' && f.missing) return state.issues.size === 0;
-    if (f.missing || !f.flags) return false;
-    if (kind === 'uncertain') return f.flags.length > 0;
+    if (!f || !dimApplies(attr)) return false;
+    if (kind === 'absent') return fieldAbsent(f);
+    if (kind === 'uncertain') return fieldUncertain(f);
     if (kind === 'flagged') return state.issues.size > 0
-      ? f.flags.some(fl => state.issues.has(fl.type))
-      : f.flags.length > 0;
-    return f.flags.some(fl => fl.type === kind);
+      ? fieldUncertain(f, fl => state.issues.has(fl.type))
+      : fieldAbsent(f) || fieldUncertain(f);
+    return fieldUncertain(f, fl => fl.type === kind);
   }
   const KIND_LABEL = k => (k === 'uncertain' || k === 'absent' ? k
     : k === 'flagged' ? (state.issues.size ? [...state.issues].map(typeName).join(' / ') : 'uncertain or absent')
@@ -1045,13 +1063,7 @@ let RECORDS = [];
 
   // How many records have any flag for this attr (unfiltered)
   function attrFlaggedRecordCount(attrKey) {
-    let n = 0;
-    for (const rec of RECORDS) {
-      const field = rec.fields[attrKey];
-      if (!field) continue;
-      if (field.missing || (field.flags && field.flags.length > 0)) n++;
-    }
-    return n;
+    return RECORDS.filter(r => fieldAbsent(r.fields[attrKey]) || fieldUncertain(r.fields[attrKey])).length;
   }
 
   // ── Render bar chart ──────────────────────────────────────────────────────
@@ -1064,14 +1076,12 @@ let RECORDS = [];
   //   • Attr filter         → only the selected attributes are shown
   function renderBarChart() {
     // Only the attributes of the selected dimensions / attributes are drawn
-    const attrs = ALL_ATTRS.filter(k =>
-      (state.dims.size === 0 || state.dims.has(ATTR_DIM[k])) &&
-      (state.attrs.size === 0 || state.attrs.has(k)));
+    // All attributes stay; a dimension filter measures only that dimension's flags,
+    // and attributes it does not apply to are marked "not applicable"
+    const attrs = ALL_ATTRS.filter(k => state.attrs.size === 0 || state.attrs.has(k));
     const issueActive = state.issues.size > 0;
     const dimActive   = state.dims.size > 0;
-    const scope = dimActive
-      ? `${DIMENSIONS.filter(d => state.dims.has(d)).join(' + ')} attributes only · `
-      : '';
+    const scope = dimActive ? `${dimNames()} gaps across attributes, where applicable · ` : '';
     const N = RECORDS.length;
 
     // Legend and title
@@ -1128,12 +1138,23 @@ let RECORDS = [];
       const badge = document.createElement('div');
       badge.className = 'bar-counts';
 
+      // The selected dimension does not apply to this attribute in the taxonomy
+      if (!dimApplies(key)) {
+        row.classList.add('na');
+        row.title = `${dimNames()} does not apply to ${ATTR_LABELS[key]} in the taxonomy`;
+        track.innerHTML = `<span class="bar-na">not applicable to ${esc(dimNames())}</span>`;
+        badge.innerHTML = '<span>n/a</span>';
+        row.append(lbl, track, badge);
+        barChart.appendChild(row);
+        continue;
+      }
+
       if (!issueActive) {
         // ── Overview mode: single bar, % of total records flagged ──
         const flaggedN   = attrFlaggedRecordCount(key);
         // records, not flags: a field can carry several flags
-        const uncertainN = RECORDS.filter(r => { const f = r.fields[key]; return f && !f.missing && f.flags && f.flags.length > 0; }).length;
-        const missingN   = RECORDS.filter(r => { const f = r.fields[key]; return f && f.missing; }).length;
+        const uncertainN = RECORDS.filter(r => fieldUncertain(r.fields[key])).length;
+        const missingN   = RECORDS.filter(r => fieldAbsent(r.fields[key])).length;
         row.title = `${ATTR_LABELS[key]}: ${uncertainN} of ${N} records uncertain, ${missingN} absent`;
 
         if (flaggedN === 0) {
@@ -1166,14 +1187,8 @@ let RECORDS = [];
         // A field can carry one or two uncertainty types, so each type is measured
         // separately (records counted once per type) instead of stacking flags.
         const types = ISSUE_TYPES.filter(t => state.issues.has(t));
-        const withType = t => RECORDS.filter(r => {
-          const f = r.fields[key];
-          return f && !f.missing && (f.flags || []).some(fl => fl.type === t);
-        }).length;
-        const anyType = RECORDS.filter(r => {
-          const f = r.fields[key];
-          return f && !f.missing && (f.flags || []).some(fl => state.issues.has(fl.type));
-        }).length;
+        const withType = t => RECORDS.filter(r => fieldUncertain(r.fields[key], fl => fl.type === t)).length;
+        const anyType = RECORDS.filter(r => fieldUncertain(r.fields[key], fl => state.issues.has(fl.type))).length;
 
         track.classList.add('grouped');
         for (const t of types) {
@@ -1227,15 +1242,10 @@ let RECORDS = [];
     // Must have at least one flag that satisfies all active filters
     for (const [key, field] of Object.entries(rec.fields)) {
       if (state.attrs.size > 0 && !state.attrs.has(key)) continue;
-      if (state.dims.size > 0  && !state.dims.has(ATTR_DIM[key])) continue;
+      if (!dimApplies(key)) continue;
 
-      if (field.missing) {
-        if (state.issues.size === 0 || state.issues.has('missing')) return true;
-      } else if (field.flags && field.flags.length > 0) {
-        for (const flag of field.flags) {
-          if (state.issues.size === 0 || state.issues.has(flag.type)) return true;
-        }
-      }
+      if (state.issues.size === 0 && fieldAbsent(field)) return true;
+      if (fieldUncertain(field, fl => state.issues.size === 0 || state.issues.has(fl.type))) return true;
     }
     // If no active filters at all, show all records
     if (state.attrs.size === 0 && state.dims.size === 0 && state.issues.size === 0 && !q) return true;
@@ -1247,18 +1257,19 @@ let RECORDS = [];
     let missing = false;
     for (const [key, field] of Object.entries(rec.fields)) {
       if (state.segment && key !== state.segment.attr) continue;
-      if (field.missing) missing = true;
-      if (field.flags) for (const f of field.flags) types.add(f.type);
+      if (state.attrs.size > 0 && !state.attrs.has(key)) continue;
+      if (!dimApplies(key)) continue;
+      if (fieldAbsent(field)) missing = true;
+      if (!field.missing) for (const f of field.flags || []) if (flagInDims(f)) types.add(f.type);
     }
-    if (missing) types.add('missing');
-    return [...types];
+    if (missing && state.issues.size === 0) types.add('missing');
+    return [...types].filter(t => t === 'missing' || state.issues.size === 0 || state.issues.has(t));
   }
 
   function totalFlagsForRecord(rec) {
     let n = 0;
-    for (const f of Object.values(rec.fields)) {
-      if (f.missing) n++;
-      else if (f.flags && f.flags.length > 0) n++;
+    for (const [key, f] of Object.entries(rec.fields)) {
+      if (dimApplies(key) && (fieldAbsent(f) || fieldUncertain(f))) n++;
     }
     return n;
   }
@@ -1377,8 +1388,7 @@ let RECORDS = [];
     });
 
     fieldCardsContent.innerHTML = '';
-    const dimsToShow = (activeTab === 'all' ? DIMENSIONS : [activeTab])
-      .filter(d => state.dims.size === 0 || state.dims.has(d));
+    const dimsToShow = activeTab === 'all' ? DIMENSIONS : [activeTab];
 
     for (const dim of dimsToShow) {
       const attrsInDim = (ATTRIBUTES[dim] || []).filter(k => state.attrs.size === 0 || state.attrs.has(k));
@@ -1402,6 +1412,7 @@ let RECORDS = [];
           : field.missing ? makeMissingCard(key, field)
           : makeFieldCard(key, field);
         if (state.segment && state.segment.attr === key) card.classList.add('focus-card');
+        if (!dimApplies(key)) { card.classList.add('na-card'); card.title = `${dimNames()} does not apply to ${ATTR_LABELS[key]} in the taxonomy`; }
         grid.appendChild(card);
       }
       grp.appendChild(grid);
@@ -1411,7 +1422,7 @@ let RECORDS = [];
 
   function makeFieldCard(key, field) {
     const card = document.createElement('div');
-    const hasFl = field.flags && field.flags.length > 0;
+    const hasFl = (field.flags || []).some(flagInDims);
     card.className = 'field-card ' + (hasFl ? 'flagged' : 'complete');
     card.innerHTML = `
       <div class="field-card-key">${key}</div>
@@ -1425,9 +1436,10 @@ let RECORDS = [];
 
   // One tag per type; hovering it lists the taxonomy rules and reasons behind it
   function flagTags(field) {
-    if (!field.flags || !field.flags.length) return '';
+    const shown = (field.flags || []).filter(flagInDims);
+    if (!shown.length) return '';
     const byType = new Map();
-    for (const f of field.flags) {
+    for (const f of shown) {
       if (!byType.has(f.type)) byType.set(f.type, []);
       if (f.note) byType.get(f.type).push(f.note);
     }
