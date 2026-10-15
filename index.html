@@ -235,8 +235,20 @@ input  { font-family: inherit; }
 }
 .bar-track.grouped { flex-direction: column; align-items: stretch; justify-content: center; gap: 2px; }
 .bar-track.grouped::before { display: none; }
-.bar-type-line { display: flex; align-items: center; height: 6px; }
-.bar-type-line .bar-segment { height: 6px; border-radius: 2px; }
+.bar-track.grouped { height: auto; min-height: 38px; padding: 3px 0; gap: 3px; }
+.bar-type-line { display: flex; align-items: center; height: 11px; }
+.bar-type-line .bar-segment { height: 11px; border-radius: 2px; }
+/* Clickable bar parts: click lists those records below */
+.bar-segment.clickable { cursor: pointer; transition: opacity var(--t), filter var(--t); }
+.bar-segment.clickable:hover { filter: brightness(0.92); outline: 1.5px solid var(--blue-deep); outline-offset: 1px; }
+.bar-segment.clickable:focus-visible { outline: 2px solid var(--blue-deep); outline-offset: 2px; }
+#bar-chart.has-pick .bar-segment.clickable:not(.picked) { opacity: 0.4; }
+.bar-segment.picked { outline: 2px solid var(--blue-deep); outline-offset: 1px; }
+.seg-clear {
+  font-size: 10px; color: var(--blue-sel); background: none; border: none; padding: 0 0 0 4px;
+  cursor: pointer; text-decoration: underline; font-family: var(--font-ui);
+}
+.field-card.focus-card, .term-card.focus-card { box-shadow: 0 0 0 2px var(--blue-sel); }
 .fdd-menu-note {
   padding: 7px 11px 6px; font-size: 10px; line-height: 1.4; color: var(--fg-3);
   border-bottom: 0.5px solid var(--border); max-width: 220px;
@@ -323,7 +335,7 @@ input  { font-family: inherit; }
   white-space: nowrap; letter-spacing: 0.02em;
 }
 .bar-track {
-  flex: 1; position: relative; height: 26px;
+  flex: 1; position: relative; height: 38px;
   display: flex; align-items: center; gap: 0;
 }
 .bar-track::before {
@@ -332,12 +344,12 @@ input  { font-family: inherit; }
 }
 /* Stacked bar segments for issue-type mode */
 .bar-segment {
-  height: 10px; border-radius: 0; position: relative; z-index: 1; flex-shrink: 0;
+  height: 20px; border-radius: 0; position: relative; z-index: 1; flex-shrink: 0;
   transition: width var(--t);
 }
-.bar-segment:first-child { border-radius: 2px 0 0 2px; }
-.bar-segment:last-child  { border-radius: 0 2px 2px 0; }
-.bar-segment:only-child  { border-radius: 2px; }
+.bar-segment:first-child { border-radius: 3px 0 0 3px; }
+.bar-segment:last-child  { border-radius: 0 3px 3px 0; }
+.bar-segment:only-child  { border-radius: 3px; }
 .bar-segment + .bar-segment { margin-left: 1px; }
 .bar-segment.incomplete   { background: var(--c-incomplete-bar); }
 .bar-segment.inconsistent { background: var(--c-inconsistent-bar); }
@@ -731,6 +743,7 @@ let RECORDS = [];
       <div id="left-panel">
         <div id="list-header">
           <div id="list-context">All records</div>
+          <button type="button" id="seg-clear" class="seg-clear" hidden>show all</button>
           <div id="list-count"></div>
         </div>
         <div id="record-list-wrap">
@@ -805,6 +818,7 @@ let RECORDS = [];
     attrs:          new Set(),   // selected attribute keys for filtering (empty = all)
     issues:         new Set(),   // selected issue types (empty = all)
     highlightedBar: null,        // key of bar row highlighted by clicking the chart
+    segment:        null,        // clicked bar part {attr, kind}: lists those records below
     selectedRecord: null,
     detailDimTab:   'all',
     searchQuery:    '',
@@ -945,6 +959,58 @@ let RECORDS = [];
     renderBarChart(); // just re-render highlights, no filter change needed
   }
 
+  // ── Bar parts → records ───────────────────────────────────────────────────
+  // kind: 'uncertain' | 'absent' | an uncertainty type ('incomplete', ...)
+  function inSegment(rec, attr, kind) {
+    const f = rec.fields[attr];
+    if (!f) return false;
+    if (kind === 'absent') return Boolean(f.missing);
+    if (f.missing || !f.flags) return false;
+    if (kind === 'uncertain') return f.flags.length > 0;
+    return f.flags.some(fl => fl.type === kind);
+  }
+  const KIND_LABEL = k => (k === 'uncertain' ? 'uncertain' : k === 'absent' ? 'absent' : k);
+
+  function makeClickable(seg, attr, kind, n) {
+    const picked = state.segment && state.segment.attr === attr && state.segment.kind === kind;
+    seg.classList.add('clickable');
+    seg.classList.toggle('picked', Boolean(picked));
+    seg.tabIndex = 0;
+    seg.setAttribute('role', 'button');
+    seg.setAttribute('aria-pressed', String(Boolean(picked)));
+    seg.title = `${ATTR_LABELS[attr]} · ${KIND_LABEL(kind)}: ${n} of ${RECORDS.length} records (${Math.round(n / RECORDS.length * 100)}%)\n` +
+      (picked ? 'Click again to show all records' : 'Click to list these records below');
+    const pick = e => {
+      e.stopPropagation();
+      state.segment = picked ? null : { attr, kind };
+      renderBarChart();
+      renderRecordList();
+      const first = state.segment && RECORDS.find(r => r.id === state.selectedRecord && inSegment(r, attr, kind))
+        || (state.segment && sortedSegmentRecords()[0]);
+      if (first) { state.selectedRecord = first.id; renderRecordList(); renderFieldCards(first); }
+      else if (!state.segment) { const rec = RECORDS.find(r => r.id === state.selectedRecord); if (rec) renderFieldCards(rec); }
+      $('record-list-wrap').scrollTop = 0;
+    };
+    seg.addEventListener('click', pick);
+    seg.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } });
+  }
+
+  function sortedSegmentRecords() {
+    const q = state.searchQuery.toLowerCase();
+    return RECORDS
+      .filter(r => inSegment(r, state.segment.attr, state.segment.kind))
+      .filter(r => !q || String(r.id).toLowerCase().includes(q) || r.title.toLowerCase().includes(q))
+      .sort((a, b) => totalFlagsForRecord(b) - totalFlagsForRecord(a));
+  }
+
+  $('seg-clear').addEventListener('click', () => {
+    state.segment = null;
+    renderBarChart();
+    renderRecordList();
+    const rec = RECORDS.find(r => r.id === state.selectedRecord);
+    if (rec) renderFieldCards(rec);
+  });
+
   // ── Analytics ─────────────────────────────────────────────────────────────
 
   // How many records have any flag for this attr (unfiltered)
@@ -1001,6 +1067,7 @@ let RECORDS = [];
 
 
     barChart.innerHTML = '';
+    barChart.classList.toggle('has-pick', Boolean(state.segment));
     if (attrs.length === 0) {
       barChart.innerHTML = '<div class="bar-zero">No attribute belongs to both the selected dimension and the selected attributes.</div>';
       return;
@@ -1048,6 +1115,7 @@ let RECORDS = [];
             const seg = document.createElement('div');
             seg.className = 'bar-segment uncertain-seg';
             seg.style.width = `${uncertainN / N * 100}%`;
+            makeClickable(seg, key, 'uncertain', uncertainN);
             track.appendChild(seg);
           }
           if (missingN > 0) {
@@ -1055,6 +1123,7 @@ let RECORDS = [];
             const seg = document.createElement('div');
             seg.className = 'bar-segment absent-seg';
             seg.style.width = `${missingN / N * 100}%`;
+            makeClickable(seg, key, 'absent', missingN);
             track.appendChild(seg);
           }
         }
@@ -1085,7 +1154,8 @@ let RECORDS = [];
           seg.className = `bar-segment ${t}`;
           seg.style.width = n ? `${n / N * 100}%` : '3px';
           if (!n) seg.style.opacity = '0.25';
-          line.title = `${t}: ${n} of ${N} records (${Math.round(n / N * 100)}%)`;
+          if (n) makeClickable(seg, key, t, n);
+          else line.title = `${t}: 0 of ${N} records`;
           line.appendChild(seg);
           track.appendChild(line);
         }
@@ -1164,14 +1234,17 @@ let RECORDS = [];
 
   function renderRecordList() {
     const hasAnyFilter = state.attrs.size > 0 || state.dims.size > 0 || state.issues.size > 0 || state.searchQuery;
-    const matching = RECORDS
+    const matching = state.segment ? sortedSegmentRecords() : RECORDS
       .filter(hasAnyFilter ? recordMatchesFilters : () => true)
       .sort((a,b) => totalFlagsForRecord(b) - totalFlagsForRecord(a));
 
     recordList.innerHTML = '';
     listCount.textContent = matching.length + ' / ' + RECORDS.length;
+    $('seg-clear').hidden = !state.segment;
 
-    if (hasAnyFilter) {
+    if (state.segment) {
+      listContext.textContent = `${ATTR_LABELS[state.segment.attr]} · ${KIND_LABEL(state.segment.kind)} (from the chart)`;
+    } else if (hasAnyFilter) {
       const parts = [];
       if (state.dims.size > 0)   parts.push([...state.dims].join(', '));
       if (state.attrs.size > 0)  parts.push([...state.attrs].map(k => ATTR_LABELS[k]).join(', '));
@@ -1246,13 +1319,11 @@ let RECORDS = [];
         const field = rec.fields[key];
         if (!field) { grid.appendChild(makePlaceholderCard(key)); continue; }
 
-        if (field.termCluster) {
-          grid.appendChild(makeTermCard(key, field));
-        } else if (field.missing) {
-          grid.appendChild(makeMissingCard(key, field));
-        } else {
-          grid.appendChild(makeFieldCard(key, field));
-        }
+        const card = field.termCluster ? makeTermCard(key, field)
+          : field.missing ? makeMissingCard(key, field)
+          : makeFieldCard(key, field);
+        if (state.segment && state.segment.attr === key) card.classList.add('focus-card');
+        grid.appendChild(card);
       }
       grp.appendChild(grid);
       fieldCardsContent.appendChild(grp);
@@ -1368,6 +1439,7 @@ let RECORDS = [];
 
   // ── Master update ─────────────────────────────────────────────────────────
   function onFilterChange() {
+    state.segment = null;
     renderFilterSummary();
     renderBarChart();
     renderRecordList();
