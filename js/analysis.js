@@ -381,10 +381,10 @@
         .map((v) => ({ ...v, count: v.occurrences.length }))
         .sort((a, b) => b.count - a.count);
       if (variants.length < 2) return null;
-      // the reference term, or the most frequent form when the reference term is not used at all
+      // A reference form exists only when the word list names one (`preferred`) and the
+      // collection uses it; no form is promoted to reference because it is the most frequent.
       const wanted = this.group.preferred && this.group.preferred.toLowerCase();
-      const preferredKey = variants.some((v) => v.key === wanted) ? wanted : variants[0].key;
-      for (const v of variants) v.preferred = !this.group.noPreferred && v.key === preferredKey;
+      for (const v of variants) v.preferred = !this.group.noPreferred && Boolean(wanted) && v.key === wanted;
       return { ...this.group, variants, total: variants.reduce((n, v) => n + v.count, 0) };
     }
   }
@@ -966,7 +966,7 @@
       }
     }
 
-    // finalise groups; flag the non-reference forms of collection-wide variants
+    // finalise groups: flag every form except a named reference form
     const groups = {};
     for (const [id, b] of builders) {
       const group = b.build();
@@ -980,11 +980,14 @@
       const ruleId = group.kind === 'vocabulary' ? (group.spatial ? null : 'INT-LING-INCONS') : group.rule;
       if (!ruleId) continue;
       const preferred = group.variants.find((v) => v.preferred);
+      const forms = group.variants.map((v) => `"${v.label}" (${v.count})`).join(', ');
       for (const variant of group.variants.filter((v) => !v.preferred)) {
         for (const o of variant.occurrences) {
           flag(byId.get(o.recordId), ruleId, o.field, o.valueIndex, {
             start: o.start, end: o.end, term: o.text, groupId: id, variant: variant.key,
-            reason: `"${o.text}" is used where the collection's reference form is "${preferred.label}" (${group.variants.length} forms in use)`,
+            reason: preferred
+              ? `"${o.text}" is used where the reference form is "${preferred.label}" (${group.variants.length} forms in use)`
+              : `The collection uses ${group.variants.length} forms for the same term: ${forms}`,
           });
         }
       }

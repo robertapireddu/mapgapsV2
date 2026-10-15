@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const A = require('../js/analysis.js');
 const IO = require('../js/io.js');
 const taxonomy = require('../data/taxonomy.js');
-const vocabulary = require('../data/vocabulary.js');
+// engine-capability tests use the example word lists; the dashboard's own lists come only from the taxonomy
+const vocabulary = require('./fixtures/example-vocabulary.js');
 const SAMPLE = require('../data/sample-data.js');
 
 const run = (rows) => A.analyse(rows, { taxonomy, vocabulary });

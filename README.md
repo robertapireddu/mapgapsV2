@@ -103,16 +103,26 @@ The script reads three sheets and regenerates `data/taxonomy.js`:
 
 A new rule code in the spreadsheet also needs detection logic in `js/analysis.js`.
 
-### Collection word lists
+### Word lists
 
-`data/vocabulary.js` holds the collection-specific knowledge the rules rely on:
+`data/vocabulary.js` holds only what the taxonomy itself states:
 
-- variant groups for inconsistent terms, each with a reference term
-- generic terms, with their known self-designations
-- contested words
-- regional labels
-- countries
-- places whose country is known
+- **One term group.** Roma, Gypsy, Gypsies, Romani, Romany, Gipsy and GRT, taken from the example
+  in rule `EXT - UI - LING - INCONS`. The taxonomy names no reference term, so when a collection
+  uses several of these forms, every form is flagged.
+- **Country names.** These come from rule `INT - SP - INCOMP`: "France, UK, Belgium, England,
+  Germany and similar".
+
+There are no contested words (the taxonomy's *Contested words* sheet lists only the false positive
+"stone-age"), no generic terms and no regional labels. The rules that use those lists flag nothing
+until the taxonomy provides them. Spelling and date-format variants are found automatically, and
+no form is treated as the reference because it is the most common.
+
+`tests/fixtures/example-vocabulary.js` contains example lists used only by the tests to exercise
+the engine. The dashboard never loads them.
+
+In the dashboard, the taxonomy's *incomplete* type is shown as **ambiguous**. Rule codes such as
+`INT - TEMP - INCOMP` are unchanged.
 
 ## Data the engine reads
 
@@ -140,6 +150,7 @@ npm run sample    # regenerate data/sample-data.js
 | `data/collection-2024904.js` | Bundled sample collection (slimmed Record API export) |
 | `scripts/slim-europeana.py` | Record API export → bundled sample, without the API key |
 | `data/taxonomy.js` | Generated from the taxonomy spreadsheet |
-| `data/vocabulary.js` | Collection word lists |
+| `data/vocabulary.js` | Word lists taken from the taxonomy |
+| `tests/fixtures/example-vocabulary.js` | Example word lists for the tests only |
 | `data/sample-data.js` | Synthetic sample collection |
 | `scripts/import-taxonomy.py` | Spreadsheet → `data/taxonomy.js` |

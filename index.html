@@ -591,6 +591,10 @@ button.modal-record-item:hover { background: var(--bg-hover); }
 <script>
 const DIMENSIONS = ['Temporal','Spatial','Textual','Attributional'];
 const ISSUE_TYPES = ['incomplete','inconsistent','contested']; // absence is not an issue type
+// Names shown in the dashboard. The taxonomy's "incomplete" type is presented as "ambiguous";
+// its rule codes (e.g. INT - TEMP - INCOMP) are unchanged.
+const TYPE_NAME = { incomplete: 'ambiguous', inconsistent: 'inconsistent', contested: 'contested', missing: 'absent' };
+const typeName = t => TYPE_NAME[t] || t;
 
 const ATTRIBUTES = {
   Temporal:      ['dctermsCreated'],
@@ -705,7 +709,7 @@ let RECORDS = [];
           <div class="fdd-item" data-val="incomplete">
             <div class="fdd-check"></div>
             <span class="fdd-issue-dot" style="background:var(--c-incomplete-bar)"></span>
-            Incomplete
+            Ambiguous
           </div>
           <div class="fdd-item" data-val="inconsistent">
             <div class="fdd-check"></div>
@@ -880,7 +884,7 @@ let RECORDS = [];
     if (n === 0) {
       lbl.textContent = dd.labelDefault;
     } else if (n <= 2) {
-      lbl.textContent = [...dd.stateSet].join(', ');
+      lbl.textContent = [...dd.stateSet].map(v => (dd.id === 'fdd-issue' ? typeName(v) : v)).join(', ');
     } else {
       lbl.textContent = dd.labelDefault;
     }
@@ -969,7 +973,7 @@ let RECORDS = [];
     if (kind === 'uncertain') return f.flags.length > 0;
     return f.flags.some(fl => fl.type === kind);
   }
-  const KIND_LABEL = k => (k === 'uncertain' ? 'uncertain' : k === 'absent' ? 'absent' : k);
+  const KIND_LABEL = k => (k === 'uncertain' || k === 'absent' ? k : typeName(k));
 
   function makeClickable(seg, attr, kind, n) {
     const picked = state.segment && state.segment.attr === attr && state.segment.kind === kind;
@@ -1055,7 +1059,7 @@ let RECORDS = [];
           missing:      'var(--c-missing-bar)',
         };
         if (t === 'missing') return `<div class="legend-item"><div class="legend-swatch missing" style="border-color:${colours[t]}"></div> absent</div>`;
-        return `<div class="legend-item"><div class="legend-swatch" style="background:${colours[t]}"></div> ${t}</div>`;
+        return `<div class="legend-item"><div class="legend-swatch" style="background:${colours[t]}"></div> ${typeName(t)}</div>`;
       }).join('') + '<div class="legend-item legend-note">a field can carry up to two types · absence excluded</div>';
     } else {
       chartTitle.textContent = scope + '% of records with uncertainty or absence, by attribute';
@@ -1155,7 +1159,7 @@ let RECORDS = [];
           seg.style.width = n ? `${n / N * 100}%` : '3px';
           if (!n) seg.style.opacity = '0.25';
           if (n) makeClickable(seg, key, t, n);
-          else line.title = `${t}: 0 of ${N} records`;
+          else line.title = `${typeName(t)}: 0 of ${N} records`;
           line.appendChild(seg);
           track.appendChild(line);
         }
@@ -1177,7 +1181,7 @@ let RECORDS = [];
     const parts = [];
     if (state.dims.size > 0)   parts.push([...state.dims].join(', '));
     if (state.attrs.size > 0)  parts.push([...state.attrs].map(k => ATTR_LABELS[k]).join(', '));
-    if (state.issues.size > 0) parts.push('uncertainty: ' + [...state.issues].join(', '));
+    if (state.issues.size > 0) parts.push('uncertainty: ' + [...state.issues].map(typeName).join(', '));
     if (state.searchQuery)     parts.push(`"${state.searchQuery}"`);
 
     if (parts.length === 0) {
@@ -1248,7 +1252,7 @@ let RECORDS = [];
       const parts = [];
       if (state.dims.size > 0)   parts.push([...state.dims].join(', '));
       if (state.attrs.size > 0)  parts.push([...state.attrs].map(k => ATTR_LABELS[k]).join(', '));
-      if (state.issues.size > 0) parts.push('uncertainty: ' + [...state.issues].join(', '));
+      if (state.issues.size > 0) parts.push('uncertainty: ' + [...state.issues].map(typeName).join(', '));
       listContext.textContent = parts.length ? parts.join(' · ') + ' — flagged records' : 'Filtered records';
     } else {
       listContext.textContent = 'All records · most flagged first';
@@ -1271,7 +1275,7 @@ let RECORDS = [];
         <div class="record-meta">
           <span class="record-id" title="${esc(rec.id)}">${esc(shortId(rec.id))}</span>
           <span class="record-title">${esc(rec.title)}</span>
-          <div class="record-pills">${types.map(t => `<span class="pill ${t}">${t === 'missing' ? 'absent' : t}</span>`).join('')}</div>
+          <div class="record-pills">${types.map(t => `<span class="pill ${t}">${typeName(t)}</span>`).join('')}</div>
         </div>
       `;
       row.addEventListener('click', () => {
@@ -1353,7 +1357,7 @@ let RECORDS = [];
       if (f.note) byType.get(f.type).push(f.note);
     }
     return `<div class="card-tags">${[...byType].map(([t, notes]) =>
-      `<span class="nature-tag ${t}" title="${esc(notes.join('\n'))}">${t === 'missing' ? 'absent' : t}${notes.length > 1 ? ` ×${notes.length}` : ''}</span>`).join('')}</div>`;
+      `<span class="nature-tag ${t}" title="${esc(notes.join('\n'))}">${typeName(t)}${notes.length > 1 ? ` ×${notes.length}` : ''}</span>`).join('')}</div>`;
   }
   function infoLine(field) {
     return field.info && field.info.length
