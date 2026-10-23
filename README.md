@@ -86,7 +86,7 @@ editing that column changes what is checked.
 | `INT - SP - INCONS` | The record's fields point to different countries |
 | `INT - SP - CONT` | Records of the same object assert different places. Records match on a shared identifier, a sameAs link, or equal title + creator + institution |
 | `INT - LING - INCOMP` | A generic or aggregated label (`folk music`, `nomads`, …). When a more specific self-designation is known (`Travellers`, `GRT` → Roma, Irish Travellers, …) and the record has none, the flag is Contested, as the rule says |
-| `INT - LING - INCONS` | Different names for the same community or thing across the collection (Gypsy / Gipsy / Romani / Roma), and spelling variants (`Horse fairs` / `horse-fairs`) |
+| `INT - LING - INCONS` | Different names for the same community or thing across the collection (Gypsy / Gipsy / Romani / Roma), and spelling variants (`Horse fairs` / `horse-fairs`). Capital letters alone (`Housing and Home` / `housing and home`) are not a difference |
 | `EXT - UI - LING - CONT` | Outdated or biased terms (the *Contested words* sheet plus `contestedWords` in `data/vocabulary.js`). The sheet's false positives (`stone-age`) are ignored |
 | `EXT - UI - SPA - INCOM` | Approximate or guessed places (`near`, `probably`, `?`) and over-broad regional labels (`the Balkans`, `Eastern Europe`) |
 | `EXT - UI - TEMP - INCOM` | Guessed, abbreviated or mistyped dates (`193-`, `19??`, `1920?`, `[1934]`, `'52`, `19522`, future years) |
@@ -95,7 +95,7 @@ editing that column changes what is checked.
 | `EXT - UI - TEMP - INCONS` | Several time indications in one field (`1930s`, `Interwar`, `thirties`) |
 | `EXT - UI - LING - INCONS` | Several names for the same community on one record (`Roma`, `Gypsy`, `Romani`) |
 | `EXT - DATAC - TEMP - INCOM` | Range or qualifier lost: `circa 1880` or `1875–1885` in the provider proxy becomes `1880` in the Europeana proxy |
-| `EXT - DATAC - TEMP - INCONS` | Approximation notation (`circa` / `ca.` / `c.`) or date format (numeric / written) differs from ISO 8601 or from each other across records. ISO 8601 dates and plain years (`1952`, `1952-06-12`) are the standard form and are never flagged |
+| `EXT - DATAC - TEMP - INCONS` | Approximation notation (`circa` / `ca.` / `c.`) varies across records. Dates of different objects written in different formats (`1952-06-12`, `09/06/1964`) are not flagged: inconsistent means the information about the same element differs |
 | `EXT - DATAC - SPA - INCOM` | Place hierarchy lost: `Cluj-Napoca, Cluj, Romania` becomes `Romania` in the Europeana proxy |
 | `EXT - DATAC - SPA - INCONS` | A country-only value next to a locality-only value, with no full hierarchy |
 | `EXT - DATAC - LING - INCOM` | Several source values collapsed to fewer in the Europeana proxy |

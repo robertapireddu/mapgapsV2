@@ -236,7 +236,7 @@ input  { font-family: inherit; }
   font-size: 10px; color: var(--blue-sel); background: none; border: none; padding: 0 0 0 4px;
   cursor: pointer; text-decoration: underline; font-family: var(--font-ui);
 }
-.field-card.focus-card, .term-card.focus-card { box-shadow: 0 0 0 2px var(--blue-sel); }
+.field-card.focus-card { box-shadow: 0 0 0 2px var(--blue-sel); }
 .fdd-menu-note {
   padding: 7px 11px 6px; font-size: 10px; line-height: 1.4; color: var(--fg-3);
   border-bottom: 0.5px solid var(--border); max-width: 220px;
@@ -450,29 +450,61 @@ input  { font-family: inherit; }
   text-transform: uppercase; color: var(--fg-3);
   margin-bottom: 7px; padding-bottom: 5px; border-bottom: 0.5px solid var(--border);
 }
-.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; }
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .field-card {
-  border-radius: var(--r); padding: 9px 11px;
-  display: flex; flex-direction: column; gap: 3px;
-  position: relative; min-height: 72px;
+  border-radius: var(--r-lg); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 6px;
+  position: relative; min-height: 120px; background: var(--bg-panel);
 }
-.field-card.complete    { background: var(--bg-panel); border: 0.5px solid var(--border); }
-.field-card.flagged     { background: var(--bg-panel); border: 1.5px solid var(--border-card); }
-.field-card.missing     { background: var(--bg-panel); border: 1.5px dashed var(--border-miss); }
+.field-card.complete    { border: 1px solid var(--border); }
+.field-card.flagged     { border: 1.5px solid var(--border-card); }
+.field-card.missing     { border: 1.5px dashed var(--border-miss); }
 .field-card.placeholder { background: transparent; border: 1.5px dashed var(--border); opacity: 0.3; order: 99; }
-.field-card-key   { font-family: var(--font-mono); font-size: 9px; color: var(--fg-3); letter-spacing: 0.03em; }
-.field-card-label { font-size: 11px; font-weight: 500; color: var(--fg-2); }
-.field-card-value { font-size: 11px; color: var(--fg); line-height: 1.4; word-break: break-word; }
-.field-card.missing .field-card-value { color: var(--fg-3); font-style: italic; }
-.card-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
-.nature-tag {
-  font-size: 9px; font-weight: 600; letter-spacing: 0.04em;
-  text-transform: uppercase; padding: 1px 5px; border-radius: 3px;
+.card-head { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px; position: relative; }
+.card-pills { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; min-width: 0; }
+.ctx-mark { font-family: var(--font-ui); font-size: 11px; color: var(--tag-contested-fg); }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
+  border: 1px solid var(--border-mid); border-radius: var(--r-xl); background: var(--bg);
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--fg-2); cursor: help; white-space: nowrap;
 }
-.nature-tag.incomplete   { background: var(--tag-incomplete-bg);   color: var(--tag-incomplete-fg); }
-.nature-tag.inconsistent { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); }
-.nature-tag.contested    { background: var(--tag-contested-bg);    color: var(--tag-contested-fg); }
-.nature-tag.missing      { background: var(--tag-missing-bg);      color: var(--tag-missing-fg); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--border-mid); }
+.status-pill.incomplete   .status-dot { background: var(--c-incomplete-bar); }
+.status-pill.inconsistent .status-dot { background: var(--c-inconsistent-bar); }
+.status-pill.contested    .status-dot { background: var(--c-contested-bar); }
+.status-pill.missing      .status-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--blue-solid); }
+.status-pill.ok { cursor: default; color: var(--fg-3); }
+.card-info-btn {
+  width: 22px; height: 22px; border-radius: 50%; border: none; flex-shrink: 0; cursor: pointer;
+  background: var(--fg-3); color: var(--bg-panel); font: italic 700 12px/22px Georgia, serif; padding: 0;
+}
+.card-info-btn:hover, .card-info-btn[aria-expanded="true"] { background: var(--fg-2); }
+.card-info-btn:focus-visible { outline: 2px solid var(--blue-sel); outline-offset: 2px; }
+.card-notes {
+  position: absolute; top: calc(100% + 6px); left: -6px; right: -6px; z-index: 5; max-height: 220px; overflow-y: auto;
+  font-size: 11.5px; color: var(--fg-2); background: var(--bg-panel); border: 1px solid var(--border-mid);
+  border-radius: var(--r); padding: 9px 11px; line-height: 1.45; box-shadow: 0 6px 18px rgba(20, 30, 50, 0.16);
+}
+.card-notes ul { margin: 0; padding-left: 16px; }
+.card-notes li + li { margin-top: 4px; }
+.card-name { font-size: 15px; font-weight: 600; color: var(--fg); }
+.card-key { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); margin-top: -4px; }
+.card-flagged {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-3);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+}
+.card-flagged > span { font-family: var(--font-ui); font-size: 12.5px; letter-spacing: 0; text-transform: none; }
+.card-more { color: var(--fg-3); }
+.field-card-value {
+  font-size: 13px; color: var(--fg); line-height: 1.55; word-break: break-word;
+  max-height: 150px; overflow-y: auto; padding-right: 4px;
+}
+.field-card.missing .field-card-value { color: var(--fg-3); font-style: italic; }
+.card-cluster {
+  align-self: flex-start; border: none; background: none; padding: 0; margin-top: 2px; cursor: pointer;
+  font: 500 11.5px var(--font-ui); color: var(--blue-sel); text-decoration: underline; text-align: left;
+}
 .contested-word, .inconsistent-word, .incomplete-word {
   border-radius: 2px; padding: 0 2px; cursor: help;
   text-decoration-line: underline; text-decoration-thickness: 2px; text-underline-offset: 3px;
@@ -485,20 +517,6 @@ input  { font-family: inherit; }
 .also-incomplete   { box-shadow: 0 0 0 1.5px var(--c-incomplete-bar); }
 #word-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 6px 0 2px; font-size: 10px; color: var(--fg-3); }
 #word-legend span[class$="-word"] { font-size: 10.5px; }
-.term-card {
-  border-radius: var(--r); padding: 9px 11px;
-  display: flex; flex-direction: column; gap: 3px; min-height: 72px;
-  cursor: pointer; transition: opacity var(--t);
-}
-.term-card:hover { opacity: 0.82; }
-.term-card.inconsistent { border: 1.5px solid var(--term-inconsistent-border); background: var(--bg-panel); }
-.term-card.contested    { border: 1.5px solid var(--term-contested-border);    background: var(--bg-panel); }
-.term-card-key   { font-family: var(--font-mono); font-size: 9px; color: var(--fg-3); }
-.term-card-label { font-size: 11px; font-weight: 500; }
-.term-card.inconsistent .term-card-label { color: var(--term-inconsistent-fg); }
-.term-card.contested    .term-card-label { color: var(--term-contested-fg); }
-.term-card-tags  { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 2px; }
-
 /* Loaded-data additions */
 #topbar-upload {
   display: flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; flex-shrink: 0;
@@ -514,11 +532,6 @@ input  { font-family: inherit; }
 .entity-link:hover { color: var(--blue-sel); }
 .placeholder-value { font-style: italic; color: var(--fg-3); }
 .value-sep { color: var(--fg-3); }
-.field-card-info { font-size: 9.5px; color: var(--fg-3); line-height: 1.35; margin-top: 2px; }
-.nature-tag { cursor: help; }
-.term-card.both { border: 1.5px solid var(--term-contested-border); background: var(--bg-panel); }
-.term-card.both .term-card-label { color: var(--term-contested-fg); }
-.term-card .field-card-value { margin: 2px 0; }
 .term-chip b { font-weight: 600; opacity: 0.7; }
 button.modal-record-item { border: none; width: 100%; text-align: left; cursor: pointer; font: inherit; color: inherit; }
 button.modal-record-item:hover { background: var(--bg-hover); }
@@ -1355,9 +1368,7 @@ let RECORDS = [];
     grid.className = 'cards-grid attr-view-grid';
     for (const rec of recs) {
       const field = rec.fields[attr];
-      const card = field.termCluster ? makeTermCard(attr, field)
-        : field.missing ? makeMissingCard(attr, field)
-        : makeFieldCard(attr, field);
+      const card = makeCard(attr, field);
       card.classList.toggle('focus-card', rec.id === state.selectedRecord);
       const head = document.createElement('div');
       head.className = 'attr-view-record';
@@ -1423,9 +1434,7 @@ let RECORDS = [];
         const field = rec.fields[key];
         if (!field) { grid.appendChild(makePlaceholderCard(key)); continue; }
 
-        const card = field.termCluster ? makeTermCard(key, field)
-          : field.missing ? makeMissingCard(key, field)
-          : makeFieldCard(key, field);
+        const card = makeCard(key, field);
         if (state.segment && state.segment.attr === key) card.classList.add('focus-card');
         if (!dimApplies(key)) { card.classList.add('na-card'); card.title = `${dimNames()} does not apply to ${ATTR_LABELS[key]} in the taxonomy`; }
         grid.appendChild(card);
@@ -1435,76 +1444,67 @@ let RECORDS = [];
     }
   }
 
-  function makeFieldCard(key, field) {
-    const card = document.createElement('div');
-    const hasFl = (field.flags || []).some(flagInDims);
-    card.className = 'field-card ' + (hasFl ? 'flagged' : 'complete');
-    card.innerHTML = `
-      <div class="field-card-key">${key}</div>
-      <div class="field-card-label">${ATTR_LABELS[key]}</div>
-      <div class="field-card-value">${field.value}</div>
-      ${flagTags(field)}
-      ${infoLine(field)}
-    `;
-    return card;
-  }
-
-  // One tag per type; hovering it lists the taxonomy rules and reasons behind it
-  function flagTags(field) {
-    const shown = (field.flags || []).filter(flagInDims);
-    if (!shown.length) return '';
+  // One card per field: type pills and an (i) for the reasons, the field name and key,
+  // the flagged words, then the value in a scrolling box
+  function makeCard(key, field) {
+    const cluster = field.termCluster && TERM_CLUSTERS[field.termCluster];
+    const flags = field.missing ? (field.flags || []) : (field.flags || []).filter(flagInDims);
     const byType = new Map();
-    const allContext = new Map(); // DE-BIAS "disambiguation needed" on every flag of this type
-    for (const f of shown) {
-      if (!byType.has(f.type)) byType.set(f.type, []);
-      if (f.note) byType.get(f.type).push(f.note);
-      allContext.set(f.type, (allContext.has(f.type) ? allContext.get(f.type) : true) && Boolean(f.contextDependent));
+    for (const f of flags) {
+      if (!byType.has(f.type)) byType.set(f.type, { notes: [], context: true });
+      const t = byType.get(f.type);
+      if (f.note) t.notes.push(f.note);
+      t.context = t.context && Boolean(f.contextDependent); // DE-BIAS "disambiguation needed"
     }
-    return `<div class="card-tags">${[...byType].map(([t, notes]) =>
-      `<span class="nature-tag ${t}" title="${esc(notes.join('\n'))}">${typeName(t)}${allContext.get(t) ? ' · check context' : ''}${notes.length > 1 ? ` ×${notes.length}` : ''}</span>`).join('')}</div>`;
-  }
-  function infoLine(field) {
-    return field.info && field.info.length
-      ? `<div class="field-card-info" title="${esc(field.info.join('\n'))}">${esc(field.info[0])}${field.info.length > 1 ? ` (+${field.info.length - 1})` : ''}</div>` : '';
-  }
+    const pills = [...byType].map(([t, x]) =>
+      `<span class="status-pill ${t}" title="${esc((x.context ? ['Check the context: DE-BIAS marks this term as context-dependent'] : []).concat(x.notes).join('\n'))}"><span class="status-dot"></span>${typeName(t)}${x.context ? ' <span class="ctx-mark" aria-label="check context">⚠</span>' : ''}</span>`).join('')
+      || (!(field.flags || []).length ? '<span class="status-pill ok"><span class="status-dot"></span>no issue</span>' : '');
 
-  function makeMissingCard(key, field) {
+    // the flagged words, taken from the highlighted spans of the value
+    const words = new Map();
+    if (!field.missing) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = field.value || '';
+      tmp.querySelectorAll('[class*="-word"]').forEach(el => {
+        const text = el.textContent.trim();
+        if (text && !words.has(text.toLowerCase())) words.set(text.toLowerCase(), `<span class="${esc(el.className)}">${esc(text)}</span>`);
+      });
+    }
+    const shownWords = [...words.values()];
+
+    const notes = [...[...byType.values()].flatMap(x => x.notes), ...(field.info || [])];
+    if (cluster && cluster.note) notes.push(`${cluster.name}: ${cluster.note}`);
+
     const card = document.createElement('div');
-    card.className = 'field-card missing';
+    card.className = 'field-card ' + (field.missing ? 'missing' : byType.size ? 'flagged' : 'complete');
     card.innerHTML = `
-      <div class="field-card-key">${key}</div>
-      <div class="field-card-label">${ATTR_LABELS[key]}</div>
-      <div class="field-card-value">—</div>
-      <div class="card-tags"><span class="nature-tag missing" title="${esc(((field && field.flags) || []).map(f => f.note).filter(Boolean).join('\n'))}">absent</span></div>
-      ${field ? infoLine(field) : ''}
+      <div class="card-head">
+        <div class="card-pills">${pills}</div>
+        ${notes.length ? '<button type="button" class="card-info-btn" aria-expanded="false" title="Why is this flagged?">i</button>' : ''}
+        <div class="card-notes" hidden><ul>${notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>
+      </div>
+      <div class="card-name">${ATTR_LABELS[key]}</div>
+      <div class="card-key">${key}</div>
+      ${shownWords.length ? `<div class="card-flagged">Flagged: ${shownWords.slice(0, 4).join(' ')}${shownWords.length > 4 ? ` <span class="card-more">+${shownWords.length - 4}</span>` : ''}</div>` : ''}
+      <div class="field-card-value">${field.missing ? esc((field.flags && field.flags[0] && field.flags[0].note) || 'Empty field') : field.value}</div>
+      ${cluster ? `<button type="button" class="card-cluster">${esc(cluster.name)} · ${cluster.terms.length} form${cluster.terms.length === 1 ? '' : 's'} →</button>` : ''}
     `;
+    const btn = card.querySelector('.card-info-btn');
+    if (btn) btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const box = card.querySelector('.card-notes');
+      box.hidden = !box.hidden;
+      btn.setAttribute('aria-expanded', String(!box.hidden));
+    });
+    const cl = card.querySelector('.card-cluster');
+    if (cl) cl.addEventListener('click', e => { e.stopPropagation(); openModal(field.termCluster); });
     return card;
   }
 
   function makePlaceholderCard(key) {
     const card = document.createElement('div');
     card.className = 'field-card placeholder';
-    card.innerHTML = `<div class="field-card-key">${key}</div><div class="field-card-label">${ATTR_LABELS[key]}</div>`;
-    return card;
-  }
-
-  function makeTermCard(key, field) {
-    const cluster = TERM_CLUSTERS[field.termCluster];
-    const types   = new Set(cluster.terms.map(t => t.type));
-    const cardCls = types.has('contested') && types.has('inconsistent') ? 'both'
-                  : types.has('contested')  ? 'contested'
-                  : 'inconsistent';
-    const card = document.createElement('div');
-    card.className = `term-card ${cardCls}`;
-    card.innerHTML = `
-      <div class="term-card-key">${key}</div>
-      <div class="term-card-label">${ATTR_LABELS[key]} · ${esc(cluster.name)}</div>
-      <div class="field-card-value">${field.value}</div>
-      <div class="term-card-tags">${cluster.terms.slice(0,3).map(t => `<span class="nature-tag ${t.type}">${esc(t.value)}</span>`).join('')}${cluster.terms.length > 3 ? `<span class="nature-tag inconsistent">+${cluster.terms.length-3}</span>` : ''}</div>
-      ${flagTags(field)}
-      ${infoLine(field)}
-    `;
-    card.addEventListener('click', () => openModal(field.termCluster));
+    card.innerHTML = `<div class="card-name">${ATTR_LABELS[key]}</div><div class="card-key">${key}</div>`;
     return card;
   }
 

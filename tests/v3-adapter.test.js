@@ -103,18 +103,26 @@ test('the bundled collection sample loads without an API key', () => {
   assert.ok(!records.some((r) => r.fields.dcType.flags.some((f) => /Vague/.test(f.note))), 'dcType is not checked for vague text');
 });
 
-test('ISO 8601 dates and plain years are never flagged as a date format', () => {
+test('dates of different records written in different formats are not inconsistent', () => {
   const out = run([
     { id: '1', dcTitle: 'A', dctermsCreated: '1952-06-12' },
     { id: '2', dcTitle: 'B', dctermsCreated: '1964' },
     { id: '3', dcTitle: 'C', dctermsCreated: '09/06/1964' },
+    { id: '4', dcTitle: 'D', dctermsCreated: '12 June 1952' },
   ]);
-  const { records } = out;
-  const format = (r) => r.fields.dctermsCreated.flags.filter((f) => /Date formats|reference form/.test(f.note));
-  assert.equal(format(records[0]).length, 0);
-  assert.equal(format(records[1]).length, 0);
-  assert.equal(records[0].fields.dctermsCreated.termCluster, undefined);
-  assert.equal(format(records[2]).length, 1, 'the numeric date is still flagged');
-  assert.deepEqual(out.clusters['format:date'].records, ['3'], 'records with ISO dates are not listed in the cluster');
-  assert.deepEqual(out.clusters['format:date'].terms.map((t) => t.value), ['Numeric (12/06/1952)'], 'ISO 8601 gets no chip');
+  assert.ok(out.records.every((r) => !r.fields.dctermsCreated.flags.some((f) => f.type === 'inconsistent')));
+  assert.ok(!Object.keys(out.clusters).some((id) => id.startsWith('format:date')));
+});
+
+test('subject terms differing only in capital letters are not inconsistent', () => {
+  const { records } = run([
+    { id: '1', dcTitle: 'A', dcSubject: 'Housing and Home' },
+    { id: '2', dcTitle: 'B', dcSubject: 'housing and home' },
+    { id: '3', dcTitle: 'C', dcSubject: 'Housing and homes' },
+  ]);
+  const incons = (r) => r.fields.dcSubject.flags.filter((f) => f.type === 'inconsistent');
+  assert.equal(incons(records[0]).length, 1, 'still flagged: "homes" is a different form');
+  assert.match(incons(records[0])[0].note, /2 forms/);
+  const only = run([{ id: '1', dcSubject: 'Housing and Home' }, { id: '2', dcSubject: 'housing and home' }]).records;
+  assert.ok(only.every((r) => !incons(r).length));
 });
