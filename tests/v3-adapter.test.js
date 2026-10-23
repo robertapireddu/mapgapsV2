@@ -116,5 +116,5 @@ test('ISO 8601 dates and plain years are never flagged as a date format', () => 
   assert.equal(records[0].fields.dctermsCreated.termCluster, undefined);
   assert.equal(format(records[2]).length, 1, 'the numeric date is still flagged');
   assert.deepEqual(out.clusters['format:date'].records, ['3'], 'records with ISO dates are not listed in the cluster');
-  assert.equal(out.clusters['format:date'].terms.find((t) => t.preferred).type, 'reference');
+  assert.deepEqual(out.clusters['format:date'].terms.map((t) => t.value), ['Numeric (12/06/1952)'], 'ISO 8601 gets no chip');
 });

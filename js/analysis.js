@@ -896,7 +896,7 @@
                 : /^(\d{1,2}\s+)?[\p{L}]{3,9}\.?\s+\d{4}$/u.test(v) ? 'Written (12 June 1952)' : null;
             if (format) {
               // ISO 8601 (years included) is the standard form: it is never flagged, other formats are
-              builder('format:date', { kind: 'format', rule: 'EXT-DATAC-TEMP-INCONS', label: 'Date formats', preferred: ISO_DATE, note: 'Precise dates written following different conventions across records. ISO 8601 dates and plain years are the standard form and are not flagged.' })
+              builder('format:date', { kind: 'format', rule: 'EXT-DATAC-TEMP-INCONS', label: 'Date formats', preferred: ISO_DATE, note: 'Precise dates not written in the standard ISO 8601 form (1952-06-12). ISO 8601 dates and plain years are not flagged.' })
                 .add(format, { recordId: record.id, field, valueIndex: i, start: 0, end: v.length, text: v });
             }
           }

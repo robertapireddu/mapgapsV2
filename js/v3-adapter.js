@@ -75,9 +75,10 @@
       clusters[id] = {
         name: g.label,
         note: g.note || '',
-        terms: g.variants.map((v) => ({
-          value: v.label, count: v.count, preferred: Boolean(v.preferred),
-          type: contestedTerms.has(fold(v.label)) ? 'contested' : v.preferred ? 'reference' : 'inconsistent',
+        // the reference form (e.g. ISO 8601 dates) is not an issue: it gets no chip
+        terms: g.variants.filter((v) => !v.preferred).map((v) => ({
+          value: v.label, count: v.count, preferred: false,
+          type: contestedTerms.has(fold(v.label)) ? 'contested' : 'inconsistent',
         })),
         records,
       };
