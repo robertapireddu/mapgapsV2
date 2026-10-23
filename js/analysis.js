@@ -171,7 +171,7 @@
     return {
       rules,
       temporal,
-      falsePositives: phraseMatcher(taxonomy.falsePositives || []),
+      falsePositives: phraseMatcher([...(taxonomy.falsePositives || []), ...(vocabulary.falsePositives || [])]),
       // contested terms come only from the contested-terms vocabulary (DE-BIAS), matched
       // exactly as written apart from capital letters and accents
       contested: exactMatcher((vocabulary.contestedTerms || []).map((t) => t.label)),

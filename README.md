@@ -128,8 +128,10 @@ Contested terms (`EXT - UI - LING - CONT`) come from the **DE-BIAS vocabulary** 
   ignoring only capital letters and accents: no plurals or other variants are added ("Minority"
   does not match "minorities").
 - False positives: terms DE-BIAS marks as needing disambiguation are shown as **"contested ·
-  check context"**. The taxonomy's false-positive list (*Contested words* sheet, notes containing
-  "false positive") suppresses phrases such as "stone-age".
+  check context"**. Phrases on the false-positive list are not flagged at all: the taxonomy's
+  own entries (*Contested words* sheet, notes containing "false positive", e.g. "stone-age") and
+  those reviewed in collection 2024904 (`falsePositives` in `data/vocabulary.js`: "coloured
+  engraving", "race meeting", "costume (mode of fashion)").
 - The flag's reason gives the DE-BIAS ID, its suggestion and its suggested alternatives.
 - Only short fields are stored (ID, label, suggestion, alternatives, bias areas, link); DE-BIAS's
   full explanations are reached through the link.

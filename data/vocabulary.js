@@ -7,13 +7,15 @@
  *                 `preferred` term no form is treated as the reference: when a
  *                 collection uses several forms, every form is flagged.
  * genericTerms    generic / aggregated labels (INT-LING-INCOMP): none given yet.
- * contestedWords  contested terms (EXT-UI-LING-CONT) beyond the taxonomy's
- *                 "Contested words" sheet: none.
+ * contestedWords  not used: contested terms (EXT-UI-LING-CONT) come only from the
+ *                 DE-BIAS vocabulary (data/debias-vocabulary.js).
  * regionalLabels  over-broad regional labels (EXT-UI-SPA-INCOM): none given yet.
  * countries       country names for "only geographical indication related to
  *                 country: France, UK, Belgium, England, Germany and similar"
  *                 (INT-SP-INCOMP); each entry is [canonical name, ...other forms].
  * placeCountries  places whose country can be inferred: none given.
+ * falsePositives  phrases in which a contested term is not contested (added to the
+ *                 taxonomy's own "false positive" entries, e.g. "stone-age").
  */
 (function (root, vocabulary) {
   if (typeof module === 'object' && module.exports) module.exports = vocabulary;
@@ -48,4 +50,8 @@
   ],
 
   placeCountries: {},
+
+  // Reviewed false positives in collection 2024904, excluded at the researcher's request:
+  // "coloured" (a colour print), "race" (horse racing), "costume" (Getty AAT fashion term)
+  falsePositives: ['coloured engraving', 'race meeting', 'costume (mode of fashion)'],
 });

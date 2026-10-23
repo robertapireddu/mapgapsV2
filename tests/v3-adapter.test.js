@@ -73,6 +73,20 @@ test('contested words come only from the DE-BIAS vocabulary', () => {
   assert.ok(!JSON.stringify(DEBIAS).includes('Contentious issue'));
 });
 
+test('reviewed false positives are not flagged as contested', () => {
+  const DEBIAS = require('../data/debias-vocabulary.js');
+  const out = toV3(A.analyse([
+    { id: '1', dcDescription: 'Fortune teller - coloured engraving after a painting by Teniers.', dcSubject: 'costume (mode of fashion)' },
+    { id: '2', dcDescription: 'Romani family camped on Epsom downs during the race meeting on Epsom racecourse.' },
+    { id: '3', dcDescription: 'A study of race and identity in the photographs.' },
+  ], { taxonomy, vocabulary: { ...vocabulary, contestedTerms: DEBIAS.terms } }), A);
+  const contested = (r, k) => (r.fields[k].flags || []).some((f) => f.type === 'contested');
+  assert.ok(!contested(out.records[0], 'dcDescription'), 'coloured engraving');
+  assert.ok(!contested(out.records[0], 'dcSubject'), 'costume (mode of fashion)');
+  assert.ok(!contested(out.records[1], 'dcDescription'), 'race meeting');
+  assert.ok(contested(out.records[2], 'dcDescription'), '"race" elsewhere is still flagged');
+});
+
 test('uploaded text is escaped', () => {
   const [r] = run([{ id: 'x', dcTitle: '<img src=x onerror=alert(1)>', dcDescription: 'A <b>bold</b> claim about the photograph taken here.' }]).records;
   assert.ok(!/<img|<b>/.test(r.fields.dcTitle.value + r.fields.dcDescription.value));
