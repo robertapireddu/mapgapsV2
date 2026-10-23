@@ -840,6 +840,7 @@ let RECORDS = [];
 <!-- ─── ENGINE: taxonomy rules, word lists, default collection, analysis ──── -->
 <script src="data/taxonomy.js"></script>
 <script src="data/vocabulary.js"></script>
+<script src="data/debias-vocabulary.js"></script>
 <script src="data/collection-2024904.js"></script>
 <script src="js/analysis.js"></script>
 <script src="js/io.js"></script>
@@ -1562,7 +1563,9 @@ let RECORDS = [];
   // ── Loading a collection ──────────────────────────────────────────────────
   // Runs the taxonomy engine over the records and refills RECORDS / TERM_CLUSTERS.
   function loadCollection(input, sourceName) {
-    const analysis = MapGapsAnalysis.analyse(input, { taxonomy: MAPGAPS_TAXONOMY, vocabulary: MAPGAPS_VOCABULARY || {} });
+    // contested terms (EXT-UI-LING-CONT) come from the DE-BIAS vocabulary
+    const vocabulary = { ...(window.MAPGAPS_VOCABULARY || {}), contestedTerms: (window.MAPGAPS_DEBIAS || {}).terms || [] };
+    const analysis = MapGapsAnalysis.analyse(input, { taxonomy: MAPGAPS_TAXONOMY, vocabulary });
     const v3 = MapGapsV3Adapter.toV3(analysis, MapGapsAnalysis);
     RECORDS = v3.records;
     TERM_CLUSTERS = v3.clusters;

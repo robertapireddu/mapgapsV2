@@ -172,7 +172,12 @@
       rules,
       temporal,
       falsePositives: phraseMatcher(taxonomy.falsePositives || []),
-      contested: phraseMatcher([...(taxonomy.contestedWords || []), ...(vocabulary.contestedWords || [])]),
+      contested: phraseMatcher([
+        ...(taxonomy.contestedWords || []), ...(vocabulary.contestedWords || []),
+        ...(vocabulary.contestedTerms || []).flatMap((t) => termForms(t.label)),
+      ]),
+      contestedEntry: new Map((vocabulary.contestedTerms || [])
+        .flatMap((t) => termForms(t.label).map((form) => [termKey(form), t]))),
       regional: phraseMatcher(vocabulary.regionalLabels || []),
       regionalNoContinents: phraseMatcher((vocabulary.regionalLabels || []).filter((l) => !/^(europe|asia|africa)$/i.test(l))),
       countryMatcher: phraseMatcher((vocabulary.countries || []).flat()),
@@ -190,6 +195,15 @@
       })),
     };
   }
+
+  // A contested-vocabulary label and its simple English plural ("Native" -> "Natives")
+  function termForms(label) {
+    const l = text(label);
+    if (!/\p{L}$/u.test(l)) return [l];
+    const plural = /(s|x|z|ch|sh)$/i.test(l) ? `${l}es` : /[^aeiou]y$/i.test(l) ? `${l.slice(0, -1)}ies` : `${l}s`;
+    return [l, plural];
+  }
+  const termKey = (s) => fold(text(s)).replace(/[\s-]+/g, ' ').replace(/[’`]/g, "'");
 
   const canonicalCountry = (ctx, v) => ctx.countryOf.get(fold(text(v)).replace(/\s+/g, ' ').replace(/\.$/, ''));
   const isCountryOnly = (ctx, v) => Boolean(canonicalCountry(ctx, v));
@@ -679,7 +693,17 @@
       for (const field of fieldsOf('EXT-UI-LING-CONT')) {
         for (const { v, i } of liveValues(record, field)) {
           for (const h of findAll(ctx.contested, v).filter(notFalsePositive(v))) {
-            flag(record, 'EXT-UI-LING-CONT', field, i, { start: h.start, end: h.end, term: h.text, reason: `"${h.text}" is an outdated or biased term introduced by the recorder` });
+            const entry = ctx.contestedEntry.get(termKey(h.text));
+            const reason = entry
+              ? `"${h.text}" is listed in the DE-BIAS vocabulary (${entry.id})` +
+                (entry.contextDependent ? ', context-dependent: check how it is used here' : '') +
+                (entry.suggestion ? `. ${entry.suggestion}` : '') +
+                (entry.alternatives && entry.alternatives.length ? ` Suggested alternatives: ${entry.alternatives.join(', ')}.` : '')
+              : `"${h.text}" is an outdated or biased term introduced by the recorder`;
+            flag(record, 'EXT-UI-LING-CONT', field, i, {
+              start: h.start, end: h.end, term: h.text, reason,
+              ...(entry ? { source: entry.id, link: entry.link, contextDependent: entry.contextDependent } : {}),
+            });
           }
         }
       }

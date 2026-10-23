@@ -52,6 +52,26 @@ test('the dashboard word lists come only from the taxonomy', () => {
   for (const v of vocabulary.variantGroups[0].variants) assert.ok(example.includes(`"${v}`), v);
 });
 
+test('contested words come from the DE-BIAS vocabulary', () => {
+  const DEBIAS = require('../data/debias-vocabulary.js');
+  const withDebias = { ...vocabulary, contestedTerms: DEBIAS.terms };
+  const out = toV3(A.analyse([
+    { id: '1', dcTitle: 'Gypsy camp', dcDescription: 'Portrait of two natives in exotic dress at the fair.' },
+  ], { taxonomy, vocabulary: withDebias }), A);
+  const f = out.records[0].fields;
+  const gypsy = f.dcTitle.flags.find((x) => x.type === 'contested');
+  assert.ok(gypsy, 'Gypsy is contested');
+  assert.match(gypsy.note, /DE-BIAS vocabulary \(debias:t_99_en\)/);
+  assert.match(gypsy.note, /Roma, Sinti/);
+  const desc = f.dcDescription.flags.filter((x) => x.type === 'contested').map((x) => x.note).join('\n');
+  assert.match(desc, /"natives"/, 'plural of "Native"');
+  assert.match(desc, /"exotic".*context-dependent/);
+  // only entries active in the DE-BIAS Knowledge Graph are used
+  assert.ok(DEBIAS.terms.length > 150);
+  assert.ok(!DEBIAS.terms.some((t) => t.label === '(((echo)))'), 'excluded from detection by DE-BIAS');
+  assert.ok(!JSON.stringify(DEBIAS).includes('Contentious issue'));
+});
+
 test('uploaded text is escaped', () => {
   const [r] = run([{ id: 'x', dcTitle: '<img src=x onerror=alert(1)>', dcDescription: 'A <b>bold</b> claim about the photograph taken here.' }]).records;
   assert.ok(!/<img|<b>/.test(r.fields.dcTitle.value + r.fields.dcDescription.value));

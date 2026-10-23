@@ -118,6 +118,25 @@ The script reads three sheets and regenerates `data/taxonomy.js`:
 
 A new rule code in the spreadsheet also needs detection logic in `js/analysis.js`.
 
+### Contested words: DE-BIAS vocabulary
+
+Contested terms (`EXT - UI - LING - CONT`) come from the **DE-BIAS vocabulary** (English sheet).
+
+- Only entries active in the DE-BIAS Knowledge Graph are used. Entries DE-BIAS excluded from
+  detection, deprecated, or still marks as work in progress are left out.
+- Matching ignores case and accents and also catches the simple plural ("Native" → "natives").
+- The flag's reason gives the DE-BIAS ID, its suggestion and its suggested alternatives. Terms
+  DE-BIAS marks as needing disambiguation are labelled *context-dependent*, so a reviewer checks
+  how the word is used.
+- Only short fields are stored (ID, label, suggestion, alternatives, bias areas, link); DE-BIAS's
+  full explanations are reached through the link.
+
+To update the list:
+
+```
+python3 -I scripts/import-debias.py path/to/DE-BIAS_Vocabulary.xlsx
+```
+
 ### Word lists
 
 `data/vocabulary.js` holds only what the taxonomy itself states:
@@ -128,8 +147,8 @@ A new rule code in the spreadsheet also needs detection logic in `js/analysis.js
 - **Country names.** These come from rule `INT - SP - INCOMP`: "France, UK, Belgium, England,
   Germany and similar".
 
-There are no contested words (the taxonomy's *Contested words* sheet lists only the false positive
-"stone-age"), no generic terms and no regional labels. The rules that use those lists flag nothing
+There are no generic terms and no regional labels; contested words come from the DE-BIAS
+vocabulary (above). The rules that use those lists flag nothing
 until the taxonomy provides them. Spelling and date-format variants are found automatically, and
 no form is treated as the reference because it is the most common.
 
@@ -166,6 +185,8 @@ npm run sample    # regenerate data/sample-data.js
 | `scripts/slim-europeana.py` | Record API export → bundled sample, without the API key |
 | `data/taxonomy.js` | Generated from the taxonomy spreadsheet |
 | `data/vocabulary.js` | Word lists taken from the taxonomy |
+| `data/debias-vocabulary.js` | Contested terms from the DE-BIAS vocabulary |
+| `scripts/import-debias.py` | DE-BIAS spreadsheet → `data/debias-vocabulary.js` |
 | `tests/fixtures/example-vocabulary.js` | Example word lists for the tests only |
 | `data/sample-data.js` | Synthetic sample collection |
 | `scripts/import-taxonomy.py` | Spreadsheet → `data/taxonomy.js` |
