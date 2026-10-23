@@ -27,23 +27,28 @@
 
   /** One value as HTML: flagged words wrapped in spans, linked entities as links. */
   function valueHtml(record, field, value, valueIndex, A) {
-    const spans = record.flags
-      .filter((f) => f.field === field && f.valueIndex === valueIndex && f.start != null && UNCERTAIN.includes(f.type))
-      .sort((a, b) => a.start - b.start || TYPE_RANK[b.type] - TYPE_RANK[a.type]);
+    const flags = record.flags.filter((f) => f.field === field && f.valueIndex === valueIndex && UNCERTAIN.includes(f.type));
+    // flags on a part of the value colour that part; flags on the whole value colour all of it
+    const spans = flags.filter((f) => f.start != null).sort((a, b) => a.start - b.start || TYPE_RANK[b.type] - TYPE_RANK[a.type]);
+    const wholeFlags = flags.filter((f) => f.start == null);
+    const wordClass = (types) => {
+      const ranked = [...new Set(types)].sort((a, b) => TYPE_RANK[b] - TYPE_RANK[a]);
+      return [`${ranked[0]}-word`, ...ranked.slice(1).map((t) => `also-${t}`)].join(' ');
+    };
     let html = '';
     let cursor = 0;
     for (const s of spans) {
       if (s.start < cursor) continue;
-      const whole = s.start === 0 && s.end === value.length;
-      if (whole) continue; // a flag covering the whole value is shown by the card's tags
-      const type = spans.filter((o) => o.start === s.start && o.end === s.end)
-        .reduce((t, o) => (TYPE_RANK[o.type] > TYPE_RANK[t] ? o.type : t), s.type);
-      const notes = spans.filter((o) => o.start === s.start && o.end === s.end).map((o) => `${o.code}: ${o.reason}`);
+      const same = spans.filter((o) => o.start === s.start && o.end === s.end);
+      const notes = same.map((o) => `${o.code}: ${o.reason}`);
       html += esc(value.slice(cursor, s.start));
-      html += `<span class="${type === 'contested' ? 'contested-word' : type === 'inconsistent' ? 'inconsistent-word' : 'incomplete-word'}" title="${esc(notes.join('\n'))}">${esc(value.slice(s.start, s.end))}</span>`;
+      html += `<span class="${wordClass(same.map((o) => o.type))}" title="${esc(notes.join('\n'))}">${esc(value.slice(s.start, s.end))}</span>`;
       cursor = s.end;
     }
     html += esc(value.slice(cursor));
+    if (wholeFlags.length) {
+      html = `<span class="${wordClass(wholeFlags.map((f) => f.type))}" title="${esc(wholeFlags.map((f) => `${f.code}: ${f.reason}`).join('\n'))}">${html}</span>`;
+    }
     const link = (record.links && record.links[field] || []).find((l) => l.label === value);
     if (link) html = `<a class="entity-link" href="${esc(link.uri)}" target="_blank" rel="noopener" title="${esc(link.uri)}">${html}</a>`;
     if (A.isPlaceholder(value)) html = `<span class="placeholder-value">${html}</span>`;

@@ -36,9 +36,9 @@
   --blue-deep:   #2A4A6A;
 
   /* Issue-type colour system */
-  --c-incomplete-bg:   #EEEDFE; --c-incomplete-fg:   #3C3489; --c-incomplete-bar:  #8880CC;
-  --c-inconsistent-bg: #E1F5EE; --c-inconsistent-fg: #085041; --c-inconsistent-bar:#3AA880;
-  --c-contested-bg:    #FCEBEB; --c-contested-fg:    #A32D2D; --c-contested-bar:   #D96060;
+  --c-incomplete-bg:   #FBF0D6; --c-incomplete-fg:   #6B4A00; --c-incomplete-bar:  #C08A12;
+  --c-inconsistent-bg: #E4EEFA; --c-inconsistent-fg: #1D4F86; --c-inconsistent-bar:#3A7FC8;
+  --c-contested-bg:    #FBE6EA; --c-contested-fg:    #9E2440; --c-contested-bar:   #D0405A;
   --c-missing-bg:      #DDE3ED; --c-missing-fg:      #3C5070; --c-missing-bar:     #7A95B8;
 
   /* Dimension colours — used for bar segmentation when dim filter active */
@@ -47,22 +47,22 @@
   --dim-textual-bar:       #5A8FC8;
   --dim-attributional-bar: #D4884A;
 
-  --tag-incomplete-bg:    #EEEDFE; --tag-incomplete-fg:    #3C3489;
-  --tag-inconsistent-bg:  #E1F5EE; --tag-inconsistent-fg:  #085041;
-  --tag-contested-bg:     #FCEBEB; --tag-contested-fg:     #A32D2D;
+  --tag-incomplete-bg:    #FBF0D6; --tag-incomplete-fg:    #6B4A00;
+  --tag-inconsistent-bg:  #E4EEFA; --tag-inconsistent-fg:  #1D4F86;
+  --tag-contested-bg:     #FBE6EA; --tag-contested-fg:     #9E2440;
   --tag-missing-bg:       #DDE3ED; --tag-missing-fg:       #3C5070;
 
-  --term-inconsistent-border: #FAC775; --term-inconsistent-fg: #633806;
-  --term-contested-border:    #F09595; --term-contested-fg:    #A32D2D;
+  --term-inconsistent-border: #9CC0E8; --term-inconsistent-fg: #1D4F86;
+  --term-contested-border:    #E8A0AE; --term-contested-fg:    #9E2440;
 
   --chip-bg:      #EDF0F5;
   --chip-active:  #2A4A6A;
   --chip-active-t:#FFFFFF;
 
   --filter-active-dim:  #1A3A5C;
-  --filter-active-issue-incomplete:  #3C3489;
-  --filter-active-issue-inconsistent:#085041;
-  --filter-active-issue-contested:   #A32D2D;
+  --filter-active-issue-incomplete:  #6B4A00;
+  --filter-active-issue-inconsistent:#1D4F86;
+  --filter-active-issue-contested:   #9E2440;
   --filter-active-issue-missing:     #3C5070;
 
   --modal-overlay: rgba(20,24,32,0.45);
@@ -83,11 +83,11 @@
     --blue-solid: #6A85A8; --blue-stripe: #4A6A90; --blue-fill: #1E2A3A;
     --blue-sel: #4A6A90; --blue-deep: #A8C4E0;
     --chip-bg: #202538; --chip-active: #4A6A90;
-    --c-incomplete-bar: #7068C0; --c-inconsistent-bar: #2A9870; --c-contested-bar: #C05050; --c-missing-bar: #5A7898;
+    --c-incomplete-bar: #B8861C; --c-inconsistent-bar: #4F8FD0; --c-contested-bar: #D4506A; --c-missing-bar: #5A7898;
     --dim-temporal-bar: #8068C8; --dim-spatial-bar: #3A8E72; --dim-textual-bar: #4A7FB8; --dim-attributional-bar: #C47840;
-    --tag-incomplete-bg: #1E1A40; --tag-incomplete-fg: #A090F0;
-    --tag-inconsistent-bg: #0E2820; --tag-inconsistent-fg: #50C090;
-    --tag-contested-bg: #3A1010; --tag-contested-fg: #F07070;
+    --tag-incomplete-bg: #3A2E10; --tag-incomplete-fg: #E8BE5C;
+    --tag-inconsistent-bg: #142A44; --tag-inconsistent-fg: #8DBBEA;
+    --tag-contested-bg: #3E1420; --tag-contested-fg: #F08AA0;
     --tag-missing-bg: #1E2A3A; --tag-missing-fg: #7090B0;
     --modal-overlay: rgba(0,0,0,0.65);
     color-scheme: dark;
@@ -100,11 +100,11 @@
   --blue-solid: #6A85A8; --blue-stripe: #4A6A90; --blue-fill: #1E2A3A;
   --blue-sel: #4A6A90; --blue-deep: #A8C4E0;
   --chip-bg: #202538; --chip-active: #4A6A90;
-  --c-incomplete-bar: #7068C0; --c-inconsistent-bar: #2A9870; --c-contested-bar: #C05050; --c-missing-bar: #5A7898;
+  --c-incomplete-bar: #B8861C; --c-inconsistent-bar: #4F8FD0; --c-contested-bar: #D4506A; --c-missing-bar: #5A7898;
   --dim-temporal-bar: #8068C8; --dim-spatial-bar: #3A8E72; --dim-textual-bar: #4A7FB8; --dim-attributional-bar: #C47840;
-  --tag-incomplete-bg: #1E1A40; --tag-incomplete-fg: #A090F0;
-  --tag-inconsistent-bg: #0E2820; --tag-inconsistent-fg: #50C090;
-  --tag-contested-bg: #3A1010; --tag-contested-fg: #F07070;
+  --tag-incomplete-bg: #3A2E10; --tag-incomplete-fg: #E8BE5C;
+  --tag-inconsistent-bg: #142A44; --tag-inconsistent-fg: #8DBBEA;
+  --tag-contested-bg: #3E1420; --tag-contested-fg: #F08AA0;
   --tag-missing-bg: #1E2A3A; --tag-missing-fg: #7090B0;
   --modal-overlay: rgba(0,0,0,0.65);
   color-scheme: dark;
@@ -485,10 +485,18 @@ input  { font-family: inherit; }
 .nature-tag.inconsistent { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); }
 .nature-tag.contested    { background: var(--tag-contested-bg);    color: var(--tag-contested-fg); }
 .nature-tag.missing      { background: var(--tag-missing-bg);      color: var(--tag-missing-fg); }
-.contested-word {
-  background: var(--tag-contested-bg); color: var(--tag-contested-fg);
+.contested-word, .inconsistent-word, .incomplete-word {
   border-radius: 2px; padding: 0 2px; cursor: help;
+  text-decoration-line: underline; text-decoration-thickness: 2px; text-underline-offset: 3px;
 }
+.contested-word    { background: var(--tag-contested-bg);    color: var(--tag-contested-fg);    text-decoration-style: solid;  text-decoration-color: var(--c-contested-bar); }
+.inconsistent-word { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); text-decoration-style: dashed; text-decoration-color: var(--c-inconsistent-bar); }
+.incomplete-word   { background: var(--tag-incomplete-bg);   color: var(--tag-incomplete-fg);   text-decoration-style: dotted; text-decoration-color: var(--c-incomplete-bar); }
+.also-contested    { box-shadow: 0 0 0 1.5px var(--c-contested-bar); }
+.also-inconsistent { box-shadow: 0 0 0 1.5px var(--c-inconsistent-bar); }
+.also-incomplete   { box-shadow: 0 0 0 1.5px var(--c-incomplete-bar); }
+#word-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 6px 0 2px; font-size: 10px; color: var(--fg-3); }
+#word-legend span[class$="-word"] { font-size: 10.5px; }
 .term-card {
   border-radius: var(--r); padding: 9px 11px;
   display: flex; flex-direction: column; gap: 3px; min-height: 72px;
@@ -513,9 +521,9 @@ input  { font-family: inherit; }
 #upload-input:focus-visible + #topbar-search, #topbar-upload:focus-within { outline: 2px solid var(--blue-sel); }
 #upload-status { font-size: 10px; color: var(--fg-3); max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #upload-status.error { color: var(--tag-contested-fg); white-space: normal; }
-.inconsistent-word { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); border-radius: 2px; padding: 0 2px; cursor: help; }
-.incomplete-word   { background: var(--tag-incomplete-bg);   color: var(--tag-incomplete-fg);   border-radius: 2px; padding: 0 2px; cursor: help; }
-.entity-link { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+.entity-link { color: inherit; text-decoration: none; }
+.entity-link::after { content: "↗"; font-size: 0.75em; margin-left: 1px; color: var(--fg-3); }
+.entity-link:hover { color: var(--blue-sel); }
 .placeholder-value { font-style: italic; color: var(--fg-3); }
 .value-sep { color: var(--fg-3); }
 .field-card-info { font-size: 9.5px; color: var(--fg-3); line-height: 1.35; margin-top: 2px; }
@@ -787,6 +795,13 @@ let RECORDS = [];
           <button type="button" id="detail-back" hidden></button>
           <div id="detail-title"></div>
           <div id="detail-sub"></div>
+          <div id="word-legend" aria-label="Colour code for highlighted words">
+            <span>Highlighted words:</span>
+            <span class="incomplete-word">ambiguous</span>
+            <span class="inconsistent-word">inconsistent</span>
+            <span class="contested-word">contested</span>
+            <span>· a ring marks a second type (e.g. <span class="contested-word also-inconsistent">Gypsy</span>)</span>
+          </div>
           <div id="detail-dim-tabs">
             <button class="dim-tab active" data-dtab="all">All fields</button>
             <button class="dim-tab" data-dtab="Temporal">Temporal</button>
