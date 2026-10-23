@@ -575,6 +575,8 @@ button.modal-record-item:hover { background: var(--bg-hover); }
 .term-chip.inconsistent { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); }
 .term-chip.contested    { background: var(--tag-contested-bg);    color: var(--tag-contested-fg); }
 .term-chip.incomplete   { background: var(--tag-incomplete-bg);   color: var(--tag-incomplete-fg); }
+/* the reference form of a cluster (e.g. ISO 8601 dates) is not an issue: neutral, no issue colour */
+.term-chip.reference, .nature-tag.reference { background: var(--chip-bg); color: var(--fg-2); }
 .modal-record-list { display: flex; flex-direction: column; gap: 3px; }
 .modal-record-item {
   display: flex; align-items: center; gap: 7px; padding: 5px 7px;

@@ -70,13 +70,14 @@
     const clusters = {};
     for (const [id, g] of Object.entries(analysis.groups)) {
       if (g.kind === 'object') continue;
-      const records = [...new Set(g.variants.flatMap((v) => v.occurrences.map((o) => o.recordId)))];
+      // only records using a flagged form: a reference form (e.g. ISO 8601 dates) is not an issue
+      const records = [...new Set(g.variants.filter((v) => !v.preferred).flatMap((v) => v.occurrences.map((o) => o.recordId)))];
       clusters[id] = {
         name: g.label,
         note: g.note || '',
         terms: g.variants.map((v) => ({
           value: v.label, count: v.count, preferred: Boolean(v.preferred),
-          type: contestedTerms.has(fold(v.label)) ? 'contested' : 'inconsistent',
+          type: contestedTerms.has(fold(v.label)) ? 'contested' : v.preferred ? 'reference' : 'inconsistent',
         })),
         records,
       };

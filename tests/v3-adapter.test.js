@@ -104,14 +104,17 @@ test('the bundled collection sample loads without an API key', () => {
 });
 
 test('ISO 8601 dates and plain years are never flagged as a date format', () => {
-  const { records } = run([
+  const out = run([
     { id: '1', dcTitle: 'A', dctermsCreated: '1952-06-12' },
     { id: '2', dcTitle: 'B', dctermsCreated: '1964' },
     { id: '3', dcTitle: 'C', dctermsCreated: '09/06/1964' },
   ]);
+  const { records } = out;
   const format = (r) => r.fields.dctermsCreated.flags.filter((f) => /Date formats|reference form/.test(f.note));
   assert.equal(format(records[0]).length, 0);
   assert.equal(format(records[1]).length, 0);
   assert.equal(records[0].fields.dctermsCreated.termCluster, undefined);
   assert.equal(format(records[2]).length, 1, 'the numeric date is still flagged');
+  assert.deepEqual(out.clusters['format:date'].records, ['3'], 'records with ISO dates are not listed in the cluster');
+  assert.equal(out.clusters['format:date'].terms.find((t) => t.preferred).type, 'reference');
 });
