@@ -37,9 +37,10 @@ Every record is flagged by the taxonomy engine (`js/analysis.js`, rules from
   applicable". An absent field counts under the dimensions of the missing-field rules that cover
   it, e.g. an empty description under Temporal, Spatial and Textual.
 - **Colour code** (same in the chart, filter, tags, pills and highlighted words): **ambiguous**
-  amber with a dotted underline, **inconsistent** blue with a dashed underline, **contested** red
-  with a solid underline. A ring in a second colour marks a word that carries two types (e.g.
-  "Gypsy": contested, ringed blue as inconsistent). The colours were checked for colour-vision
+  butter yellow with a dotted underline, **inconsistent** lavender with a dashed underline,
+  **contested** apricot with a solid underline (pastels chosen to sit with the blue interface). A
+  ring in a second colour marks a word that carries two types (e.g. "Gypsy": contested, ringed
+  lavender as inconsistent). The colours were checked for colour-vision
   deficiency; the underline styles give a second cue.
 - **Absent**: the field is empty, or holds only a placeholder such as "none" or "unknown".
 - **Uncertainty types**: incomplete, inconsistent and contested flags from the taxonomy rules. A
