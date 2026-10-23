@@ -1459,12 +1459,14 @@ let RECORDS = [];
     const shown = (field.flags || []).filter(flagInDims);
     if (!shown.length) return '';
     const byType = new Map();
+    const allContext = new Map(); // DE-BIAS "disambiguation needed" on every flag of this type
     for (const f of shown) {
       if (!byType.has(f.type)) byType.set(f.type, []);
       if (f.note) byType.get(f.type).push(f.note);
+      allContext.set(f.type, (allContext.has(f.type) ? allContext.get(f.type) : true) && Boolean(f.contextDependent));
     }
     return `<div class="card-tags">${[...byType].map(([t, notes]) =>
-      `<span class="nature-tag ${t}" title="${esc(notes.join('\n'))}">${typeName(t)}${notes.length > 1 ? ` ×${notes.length}` : ''}</span>`).join('')}</div>`;
+      `<span class="nature-tag ${t}" title="${esc(notes.join('\n'))}">${typeName(t)}${allContext.get(t) ? ' · check context' : ''}${notes.length > 1 ? ` ×${notes.length}` : ''}</span>`).join('')}</div>`;
   }
   function infoLine(field) {
     return field.info && field.info.length

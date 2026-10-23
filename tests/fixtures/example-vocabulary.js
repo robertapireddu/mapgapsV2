@@ -21,6 +21,8 @@
  * placeCountries  places whose country can be inferred (for spatial checks).
  */
 (function (root, vocabulary) {
+  // the engine reads contested terms only from `contestedTerms`
+  vocabulary.contestedTerms = vocabulary.contestedWords.map((label) => ({ id: 'example', label }));
   if (typeof module === 'object' && module.exports) module.exports = vocabulary;
   else root.MAPGAPS_EXAMPLE_VOCABULARY = vocabulary;
 })(typeof self !== 'undefined' ? self : this, {

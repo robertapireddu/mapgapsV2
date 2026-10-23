@@ -172,12 +172,10 @@
       rules,
       temporal,
       falsePositives: phraseMatcher(taxonomy.falsePositives || []),
-      contested: phraseMatcher([
-        ...(taxonomy.contestedWords || []), ...(vocabulary.contestedWords || []),
-        ...(vocabulary.contestedTerms || []).flatMap((t) => termForms(t.label)),
-      ]),
-      contestedEntry: new Map((vocabulary.contestedTerms || [])
-        .flatMap((t) => termForms(t.label).map((form) => [termKey(form), t]))),
+      // contested terms come only from the contested-terms vocabulary (DE-BIAS), matched
+      // exactly as written apart from capital letters and accents
+      contested: exactMatcher((vocabulary.contestedTerms || []).map((t) => t.label)),
+      contestedEntry: new Map((vocabulary.contestedTerms || []).map((t) => [termKey(t.label), t])),
       regional: phraseMatcher(vocabulary.regionalLabels || []),
       regionalNoContinents: phraseMatcher((vocabulary.regionalLabels || []).filter((l) => !/^(europe|asia|africa)$/i.test(l))),
       countryMatcher: phraseMatcher((vocabulary.countries || []).flat()),
@@ -196,14 +194,14 @@
     };
   }
 
-  // A contested-vocabulary label and its simple English plural ("Native" -> "Natives")
-  function termForms(label) {
-    const l = text(label);
-    if (!/\p{L}$/u.test(l)) return [l];
-    const plural = /(s|x|z|ch|sh)$/i.test(l) ? `${l}es` : /[^aeiou]y$/i.test(l) ? `${l.slice(0, -1)}ies` : `${l}s`;
-    return [l, plural];
+  /** Whole-word matcher for labels exactly as written (only case and accents are ignored). */
+  function exactMatcher(labels) {
+    const list = uniq(labels.map(text).filter(Boolean)).sort((a, b) => b.length - a.length);
+    if (!list.length) return null;
+    const alternatives = list.map((l) => escapeRe(foldKeep(l)).replace(/\s+/g, '\\s+'));
+    return new RegExp(`(?<![\\p{L}\\p{N}])(?:${alternatives.join('|')})(?![\\p{L}\\p{N}])`, 'gu');
   }
-  const termKey = (s) => fold(text(s)).replace(/[\s-]+/g, ' ').replace(/[’`]/g, "'");
+  const termKey = (s) => fold(text(s)).replace(/\s+/g, ' ');
 
   const canonicalCountry = (ctx, v) => ctx.countryOf.get(fold(text(v)).replace(/\s+/g, ' ').replace(/\.$/, ''));
   const isCountryOnly = (ctx, v) => Boolean(canonicalCountry(ctx, v));

@@ -52,7 +52,7 @@ test('the dashboard word lists come only from the taxonomy', () => {
   for (const v of vocabulary.variantGroups[0].variants) assert.ok(example.includes(`"${v}`), v);
 });
 
-test('contested words come from the DE-BIAS vocabulary', () => {
+test('contested words come only from the DE-BIAS vocabulary', () => {
   const DEBIAS = require('../data/debias-vocabulary.js');
   const withDebias = { ...vocabulary, contestedTerms: DEBIAS.terms };
   const out = toV3(A.analyse([
@@ -64,8 +64,9 @@ test('contested words come from the DE-BIAS vocabulary', () => {
   assert.match(gypsy.note, /DE-BIAS vocabulary \(debias:t_99_en\)/);
   assert.match(gypsy.note, /Roma, Sinti/);
   const desc = f.dcDescription.flags.filter((x) => x.type === 'contested').map((x) => x.note).join('\n');
-  assert.match(desc, /"natives"/, 'plural of "Native"');
   assert.match(desc, /"exotic".*context-dependent/);
+  // labels are matched exactly as written (apart from capitals): no plural forms are added
+  assert.doesNotMatch(desc, /"natives"/);
   // only entries active in the DE-BIAS Knowledge Graph are used
   assert.ok(DEBIAS.terms.length > 150);
   assert.ok(!DEBIAS.terms.some((t) => t.label === '(((echo)))'), 'excluded from detection by DE-BIAS');

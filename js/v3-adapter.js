@@ -98,7 +98,7 @@
           const note = `${f.code}: ${f.reason}`;
           if (seen.has(f.type + note)) continue;
           seen.add(f.type + note);
-          flags.push({ type: f.type, dim: DIM[f.dimension] || ATTR_DIM[key], code: f.code, note });
+          flags.push({ type: f.type, dim: DIM[f.dimension] || ATTR_DIM[key], code: f.code, note, contextDependent: Boolean(f.contextDependent) });
         }
         const grouped = all.find((f) => f.groupId && clusters[f.groupId] && f.type === 'inconsistent') ||
           r.terms.map((t) => (t.field === key && clusters[t.groupId] ? { groupId: t.groupId } : null)).find(Boolean);
