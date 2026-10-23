@@ -36,7 +36,8 @@ Every record is flagged by the taxonomy engine (`js/analysis.js`, rules from
   dimension lists the attribute among its fields; the other attributes are marked "not
   applicable". An absent field counts under the dimensions of the missing-field rules that cover
   it, e.g. an empty description under Temporal, Spatial and Textual.
-- **Colour code** (same in the chart, filter, tags, pills and highlighted words): **ambiguous**
+- **Colour code** (same in the chart, filter, tags, pills and highlighted words). Colour is kept
+  for the uncertainty types only; dimensions are written as text under each attribute. **ambiguous**
   butter yellow with a dotted underline, **inconsistent** lavender with a dashed underline,
   **contested** apricot with a solid underline (pastels chosen to sit with the blue interface). A
   ring in a second colour marks a word that carries two types (e.g. "Gypsy": contested, ringed

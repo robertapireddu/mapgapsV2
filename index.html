@@ -41,12 +41,6 @@
   --c-contested-bg:    #FBEDE3; --c-contested-fg:    #8A4A22; --c-contested-bar:   #E7AE86;
   --c-missing-bg:      #DDE3ED; --c-missing-fg:      #3C5070; --c-missing-bar:     #7A95B8;
 
-  /* Dimension colours — used for bar segmentation when dim filter active */
-  --dim-temporal-bar:      #9B7FD4;
-  --dim-spatial-bar:       #4A9E82;
-  --dim-textual-bar:       #5A8FC8;
-  --dim-attributional-bar: #D4884A;
-
   --tag-incomplete-bg:    #FCF3DC; --tag-incomplete-fg:    #6B4E12;
   --tag-inconsistent-bg:  #EFEAFA; --tag-inconsistent-fg:  #4B3A8C;
   --tag-contested-bg:     #FBEDE3; --tag-contested-fg:     #8A4A22;
@@ -84,7 +78,6 @@
     --blue-sel: #4A6A90; --blue-deep: #A8C4E0;
     --chip-bg: #202538; --chip-active: #4A6A90;
     --c-incomplete-bar: #E2C682; --c-inconsistent-bar: #A796D8; --c-contested-bar: #D89E78; --c-missing-bar: #5A7898;
-    --dim-temporal-bar: #8068C8; --dim-spatial-bar: #3A8E72; --dim-textual-bar: #4A7FB8; --dim-attributional-bar: #C47840;
     --tag-incomplete-bg: #3A3220; --tag-incomplete-fg: #F4D89A;
     --tag-inconsistent-bg: #2C2645; --tag-inconsistent-fg: #CFC3F2;
     --tag-contested-bg: #3D2A1F; --tag-contested-fg: #F0BE9C;
@@ -101,7 +94,6 @@
   --blue-sel: #4A6A90; --blue-deep: #A8C4E0;
   --chip-bg: #202538; --chip-active: #4A6A90;
   --c-incomplete-bar: #E2C682; --c-inconsistent-bar: #A796D8; --c-contested-bar: #D89E78; --c-missing-bar: #5A7898;
-  --dim-temporal-bar: #8068C8; --dim-spatial-bar: #3A8E72; --dim-textual-bar: #4A7FB8; --dim-attributional-bar: #C47840;
   --tag-incomplete-bg: #3A3220; --tag-incomplete-fg: #F4D89A;
   --tag-inconsistent-bg: #2C2645; --tag-inconsistent-fg: #CFC3F2;
   --tag-contested-bg: #3D2A1F; --tag-contested-fg: #F0BE9C;
@@ -225,10 +217,6 @@ input  { font-family: inherit; }
   border-left: 1.5px solid #fff; border-bottom: 1.5px solid #fff;
   transform: rotate(-45deg) translateY(-1px);
 }
-/* Dimension items get their own colour dot */
-.fdd-dim-dot {
-  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; opacity: 0.8;
-}
 /* Issue type items */
 .fdd-issue-dot {
   width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0;
@@ -334,6 +322,10 @@ input  { font-family: inherit; }
   font-family: var(--font-mono); font-size: 8.5px; color: var(--fg-3);
   white-space: nowrap; letter-spacing: 0.02em;
 }
+/* dimension shown as text: colour is kept for the uncertainty types */
+.bar-row-label .lbl-dim {
+  font-size: 8.5px; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.06em;
+}
 .bar-track {
   flex: 1; position: relative; height: 38px;
   display: flex; align-items: center; gap: 0;
@@ -356,10 +348,6 @@ input  { font-family: inherit; }
 .bar-segment.contested    { background: var(--c-contested-bar); }
 .bar-segment.missing-seg  { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c-missing-bar); }
 /* Dimension segments */
-.bar-segment.dim-Temporal      { background: var(--dim-temporal-bar); }
-.bar-segment.dim-Spatial       { background: var(--dim-spatial-bar); }
-.bar-segment.dim-Textual       { background: var(--dim-textual-bar); }
-.bar-segment.dim-Attributional { background: var(--dim-attributional-bar); }
 /* Simple uncertain bar (no issue filter) */
 .bar-uncertain { height: 10px; border-radius: 2px; position: relative; z-index: 1; background: var(--blue-solid); flex-shrink: 0; }
 .bar-missing   {
@@ -649,10 +637,6 @@ const ATTR_LABELS = {
 const ATTR_DIM = {};
 for (const [dim,attrs] of Object.entries(ATTRIBUTES)) for (const a of attrs) ATTR_DIM[a] = dim;
 
-const DIM_COLOURS = {
-  Temporal:'var(--dim-temporal-bar)', Spatial:'var(--dim-spatial-bar)',
-  Textual:'var(--dim-textual-bar)',  Attributional:'var(--dim-attributional-bar)',
-};
 
 // Filled from the loaded collection by loadCollection() (see js/v3-adapter.js)
 let TERM_CLUSTERS = {};
@@ -695,22 +679,18 @@ let RECORDS = [];
         <div class="fdd-menu" id="fdd-dim-menu">
           <div class="fdd-item" data-val="Temporal">
             <div class="fdd-check"></div>
-            <span class="fdd-dim-dot" style="background:var(--dim-temporal-bar)"></span>
             Temporal
           </div>
           <div class="fdd-item" data-val="Spatial">
             <div class="fdd-check"></div>
-            <span class="fdd-dim-dot" style="background:var(--dim-spatial-bar)"></span>
             Spatial
           </div>
           <div class="fdd-item" data-val="Textual">
             <div class="fdd-check"></div>
-            <span class="fdd-dim-dot" style="background:var(--dim-textual-bar)"></span>
             Textual
           </div>
           <div class="fdd-item" data-val="Attributional">
             <div class="fdd-check"></div>
-            <span class="fdd-dim-dot" style="background:var(--dim-attributional-bar)"></span>
             Attributional
           </div>
           <div class="fdd-menu-footer"><button class="fdd-clear" data-clr="dim">Clear</button></div>
@@ -1166,9 +1146,9 @@ let RECORDS = [];
       lbl.innerHTML = `
         <div class="lbl-name">
           ${ATTR_LABELS[key]}
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${DIM_COLOURS[ATTR_DIM[key]]};flex-shrink:0;opacity:0.7"></span>
         </div>
         <div class="lbl-key">${key}</div>
+        <div class="lbl-dim">${ATTR_DIM[key]}</div>
       `;
 
       const track = document.createElement('div');
