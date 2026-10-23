@@ -94,7 +94,7 @@ editing that column changes what is checked.
 | `EXT - UI - TEMP - INCONS` | Several time indications in one field (`1930s`, `Interwar`, `thirties`) |
 | `EXT - UI - LING - INCONS` | Several names for the same community on one record (`Roma`, `Gypsy`, `Romani`) |
 | `EXT - DATAC - TEMP - INCOM` | Range or qualifier lost: `circa 1880` or `1875–1885` in the provider proxy becomes `1880` in the Europeana proxy |
-| `EXT - DATAC - TEMP - INCONS` | Approximation notation (`circa` / `ca.` / `c.`) or date format (ISO / numeric / written) varies across records |
+| `EXT - DATAC - TEMP - INCONS` | Approximation notation (`circa` / `ca.` / `c.`) or date format (numeric / written) differs from ISO 8601 or from each other across records. ISO 8601 dates and plain years (`1952`, `1952-06-12`) are the standard form and are never flagged |
 | `EXT - DATAC - SPA - INCOM` | Place hierarchy lost: `Cluj-Napoca, Cluj, Romania` becomes `Romania` in the Europeana proxy |
 | `EXT - DATAC - SPA - INCONS` | A country-only value next to a locality-only value, with no full hierarchy |
 | `EXT - DATAC - LING - INCOM` | Several source values collapsed to fewer in the Europeana proxy |
