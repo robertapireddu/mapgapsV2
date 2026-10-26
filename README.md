@@ -28,8 +28,7 @@ Every record is flagged by the taxonomy engine (`js/analysis.js`, rules from
 
 - **Chart selection**: clicking an attribute in the chart (or one part of its bar) shows, below
   the chart, only that attribute for the records flagged in it; "open record" shows a whole record.
-- **View all records**: the full record list (narrowed by the filters and the search box) opens in
-  a panel on the right only from this button, so it is never confused with a chart selection.
+- **Search**: narrows the records shown for the selected attribute by title or ID.
 - **Dimension filter**: all attributes stay in the chart. Each bar counts only the chosen
   dimension's flags, wherever that dimension applies, e.g. temporal keywords in Subject or
   Description. A dimension applies to an attribute when one of the taxonomy's rules for that

@@ -368,57 +368,8 @@ input  { font-family: inherit; }
 /* Bar zero state */
 .bar-zero { font-size: 12px; color: var(--fg-3); padding: 12px 0 4px; text-align: center; }
 
-/* ── Bottom: record list + field cards ───────────────────────────────────── */
+/* ── Bottom: field cards ─────────────────────────────────────────────────── */
 #bottom { display: flex; flex: 1; overflow: hidden; min-height: 0; }
-
-/* Left: record list */
-#left-panel {
-  width: 280px; flex-shrink: 0; display: flex; flex-direction: column;
-  border-left: 0.5px solid var(--border); background: var(--bg-panel); overflow: hidden;
-}
-#list-close {
-  border: none; background: none; color: var(--fg-3); font-size: 18px; line-height: 1;
-  padding: 0 2px; cursor: pointer;
-}
-#list-close:hover { color: var(--fg); }
-#view-all-records {
-  margin-left: auto; font-size: 13px; font-weight: 500; padding: 4px 11px; border-radius: var(--r);
-  border: 0.5px solid var(--blue-sel); background: var(--bg-panel); color: var(--blue-deep); cursor: pointer;
-}
-#view-all-records:hover { background: var(--bg-hover); }
-#view-all-records[aria-expanded="true"] { background: var(--blue-fill); }
-#list-header {
-  padding: 8px 14px 7px; border-bottom: 0.5px solid var(--border);
-  flex-shrink: 0; display: flex; align-items: center; gap: 6px;
-}
-#list-context { font-size: 12px; color: var(--fg-3); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#list-count { font-family: var(--font-mono); font-size: 12px; color: var(--blue-sel); flex-shrink: 0; font-variant-numeric: tabular-nums; }
-#record-list-wrap { flex: 1; overflow-y: auto; padding: 4px 0; }
-#record-list-empty { padding: 24px 14px; text-align: center; color: var(--fg-3); font-size: 13px; line-height: 1.6; }
-
-.record-row {
-  display: flex; align-items: flex-start; gap: 8px;
-  padding: 7px 14px; cursor: pointer;
-  border-left: 2.5px solid transparent;
-  transition: background var(--t), border-color var(--t);
-}
-.record-row:hover { background: var(--bg-hover); }
-.record-row.selected { background: var(--bg-hover); border-left-color: var(--blue-sel); }
-.record-thumb {
-  width: 26px; height: 26px; border-radius: 3px;
-  background: var(--bg-panel-2); border: 0.5px solid var(--border);
-  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  color: var(--fg-3); margin-top: 1px;
-}
-.record-meta { flex: 1; min-width: 0; }
-.record-id    { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); display: block; }
-.record-title { font-size: 13px; font-weight: 500; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; margin-bottom: 3px; }
-.record-pills { display: flex; flex-wrap: wrap; gap: 2px; }
-.pill { font-size: 11px; padding: 1px 5px; border-radius: 8px; font-weight: 500; white-space: nowrap; }
-.pill.incomplete   { background: var(--tag-incomplete-bg);   color: var(--tag-incomplete-fg); }
-.pill.inconsistent { background: var(--tag-inconsistent-bg); color: var(--tag-inconsistent-fg); }
-.pill.contested    { background: var(--tag-contested-bg);    color: var(--tag-contested-fg); }
-.pill.missing      { background: var(--tag-missing-bg);      color: var(--tag-missing-fg); }
 
 /* Right: field cards */
 #right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
@@ -442,6 +393,7 @@ input  { font-family: inherit; }
 }
 #right-empty svg { color: var(--fg-3); opacity: 0.3; }
 #right-empty p { color: var(--fg-3); font-size: 14px; line-height: 1.7; margin: 0; }
+#right-empty #search-hint { color: var(--blue-deep); margin-top: 6px; }
 #right-empty strong { display: block; color: var(--fg-2); font-size: 15px; margin-bottom: 3px; }
 #field-cards-wrap { flex: 1; overflow-y: auto; padding: 14px 18px; }
 .dim-group { margin-bottom: 18px; }
@@ -559,6 +511,7 @@ button.modal-record-item:hover { background: var(--bg-hover); }
   display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
   padding-bottom: 5px; margin-bottom: 3px; border-bottom: 0.5px solid var(--border);
 }
+.record-id { display: block; }
 .attr-view-record .record-id { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); }
 .attr-view-title { font-size: 13px; font-weight: 600; color: var(--fg); flex: 1; min-width: 0; }
 .attr-view-record .seg-clear { padding: 0; }
@@ -628,7 +581,6 @@ button.modal-record-item:hover { background: var(--bg-hover); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0ms !important; } }
 
 @media (max-width: 700px) {
-  #left-panel { width: 220px; }
   .bar-row-label { width: 100px; }
   .filter-label { width: 60px; }
 }
@@ -637,7 +589,6 @@ button.modal-record-item:hover { background: var(--bg-hover); }
   #topbar-collection { display: none; }
   #topbar-search { min-width: 0; flex: 1; }
   #bottom { flex-direction: column; }
-  #left-panel { width: 100%; height: 240px; border-left: none; border-top: 0.5px solid var(--border); }
 }
 </style>
 </head>
@@ -688,7 +639,7 @@ let RECORDS = [];
     <input type="file" id="upload-input" accept=".json,.csv,application/json,text/csv" hidden>
     <div id="topbar-search">
       <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="4.5" cy="4.5" r="3"/><line x1="7" y1="7" x2="10" y2="10"/></svg>
-      <input id="search-input" type="text" placeholder="Search records…" autocomplete="off">
+      <input id="search-input" type="text" placeholder="Search by title or ID…" autocomplete="off">
     </div>
   </div>
 
@@ -774,7 +725,6 @@ let RECORDS = [];
       </div>
 
       <button id="filter-reset">Reset all</button>
-      <button type="button" id="view-all-records" aria-expanded="false" aria-controls="left-panel">View all records</button>
 
     </div><!-- /filter-panel -->
 
@@ -798,7 +748,8 @@ let RECORDS = [];
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.1">
             <rect x="5" y="3" width="26" height="30" rx="3"/><line x1="10" y1="10" x2="26" y2="10"/><line x1="10" y1="16" x2="20" y2="16"/><line x1="10" y1="22" x2="18" y2="22"/>
           </svg>
-          <p><strong>Click an attribute in the chart</strong>Click an attribute name, or one part of its bar, to see that attribute for the records flagged in it. To browse every record, use <em>View all records</em>.</p>
+          <p><strong>Click an attribute in the chart</strong>Click an attribute name, or one part of its bar, to see that attribute for the records flagged in it. Then use <em>open record</em> on a card to see the whole record.</p>
+          <p id="search-hint" hidden>The search box filters the records of the attribute you select in the chart.</p>
         </div>
         <div id="detail-header" hidden>
           <button type="button" id="detail-back" hidden></button>
@@ -823,19 +774,6 @@ let RECORDS = [];
           <div id="field-cards-content"></div>
         </div>
       </div>
-
-      <!-- All records: opens only from the "View all records" button -->
-      <aside id="left-panel" hidden aria-label="All records">
-        <div id="list-header">
-          <div id="list-context">All records</div>
-          <div id="list-count"></div>
-          <button type="button" id="list-close" aria-label="Close the record list">×</button>
-        </div>
-        <div id="record-list-wrap">
-          <div id="record-list-empty" hidden>No records match.</div>
-          <div id="record-list"></div>
-        </div>
-      </aside>
 
     </div>
   </div>
@@ -907,10 +845,6 @@ let RECORDS = [];
   // ── DOM ───────────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
   const barChart        = $('bar-chart');
-  const recordList      = $('record-list');
-  const recordEmpty     = $('record-list-empty');
-  const listContext     = $('list-context');
-  const listCount       = $('list-count');
   const rightEmpty      = $('right-empty');
   const detailHeader    = $('detail-header');
   const detailTitle     = $('detail-title');
@@ -1011,9 +945,9 @@ let RECORDS = [];
 
   searchInput.addEventListener('input', () => {
     state.searchQuery = searchInput.value.trim();
-    if (state.searchQuery && $('left-panel').hidden) setListOpen(true);
-    renderRecordList();
+    renderFilterSummary();
     if (state.segment) renderAttributeView();
+    else if (state.selectedRecord == null) showEmptyDetail();
   });
 
   // ── Highlight a bar row by clicking it (independent from attr filter) ──────
@@ -1077,14 +1011,13 @@ let RECORDS = [];
     state.segment = segment;
     state.selectedRecord = null;
     renderBarChart();
-    renderRecordList();
-    $('record-list-wrap').scrollTop = 0;
     if (state.segment) renderAttributeView();
     else showEmptyDetail();
   }
 
   function showEmptyDetail() {
     rightEmpty.hidden = false;
+    $('search-hint').hidden = !state.searchQuery;
     detailHeader.hidden = true;
     fieldCardsWrap.hidden = true;
   }
@@ -1096,16 +1029,6 @@ let RECORDS = [];
       .filter(r => !q || String(r.id).toLowerCase().includes(q) || r.title.toLowerCase().includes(q))
       .sort((a, b) => totalFlagsForRecord(b) - totalFlagsForRecord(a));
   }
-
-  // ── "View all records" panel ──────────────────────────────────────────────
-  function setListOpen(open) {
-    $('left-panel').hidden = !open;
-    $('view-all-records').setAttribute('aria-expanded', String(open));
-    $('view-all-records').textContent = open ? 'Hide all records' : 'View all records';
-    if (open) renderRecordList();
-  }
-  $('view-all-records').addEventListener('click', e => { e.stopPropagation(); setListOpen($('left-panel').hidden); });
-  $('list-close').addEventListener('click', () => setListOpen(false));
 
   // ── Analytics ─────────────────────────────────────────────────────────────
 
@@ -1282,87 +1205,12 @@ let RECORDS = [];
     }
   }
 
-  // ── Record list ───────────────────────────────────────────────────────────
-  function recordMatchesFilters(rec) {
-    const q = state.searchQuery.toLowerCase();
-    if (q && !String(rec.id).includes(q) && !rec.title.toLowerCase().includes(q)) return false;
-
-    // Must have at least one flag that satisfies all active filters
-    for (const [key, field] of Object.entries(rec.fields)) {
-      if (state.attrs.size > 0 && !state.attrs.has(key)) continue;
-      if (!dimApplies(key)) continue;
-
-      if (state.issues.size === 0 && fieldAbsent(field)) return true;
-      if (fieldUncertain(field, fl => state.issues.size === 0 || state.issues.has(fl.type))) return true;
-    }
-    // If no active filters at all, show all records
-    if (state.attrs.size === 0 && state.dims.size === 0 && state.issues.size === 0 && !q) return true;
-    return false;
-  }
-
-  function recordFlagSummary(rec) {
-    const types = new Set();
-    let missing = false;
-    for (const [key, field] of Object.entries(rec.fields)) {
-      if (state.attrs.size > 0 && !state.attrs.has(key)) continue;
-      if (!dimApplies(key)) continue;
-      if (fieldAbsent(field)) missing = true;
-      if (!field.missing) for (const f of field.flags || []) if (flagInDims(f)) types.add(f.type);
-    }
-    if (missing && state.issues.size === 0) types.add('missing');
-    return [...types].filter(t => t === 'missing' || state.issues.size === 0 || state.issues.has(t));
-  }
-
   function totalFlagsForRecord(rec) {
     let n = 0;
     for (const [key, f] of Object.entries(rec.fields)) {
       if (dimApplies(key) && (fieldAbsent(f) || fieldUncertain(f))) n++;
     }
     return n;
-  }
-
-  function renderRecordList() {
-    const hasAnyFilter = state.attrs.size > 0 || state.dims.size > 0 || state.issues.size > 0 || state.searchQuery;
-    const matching = RECORDS
-      .filter(hasAnyFilter ? recordMatchesFilters : () => true)
-      .sort((a,b) => totalFlagsForRecord(b) - totalFlagsForRecord(a));
-
-    recordList.innerHTML = '';
-    listCount.textContent = matching.length + ' / ' + RECORDS.length;
-
-    if (hasAnyFilter) {
-      const parts = [];
-      if (state.dims.size > 0)   parts.push([...state.dims].join(', '));
-      if (state.attrs.size > 0)  parts.push([...state.attrs].map(k => ATTR_LABELS[k]).join(', '));
-      if (state.issues.size > 0) parts.push('uncertainty: ' + [...state.issues].map(typeName).join(', '));
-      listContext.textContent = parts.length ? parts.join(' · ') + ' — flagged records' : 'Filtered records';
-    } else {
-      listContext.textContent = 'All records · most flagged first';
-    }
-
-    if (matching.length === 0) {
-      recordEmpty.hidden = false;
-      return;
-    }
-    recordEmpty.hidden = true;
-
-    for (const rec of matching) {
-      const types = recordFlagSummary(rec);
-      const row = document.createElement('div');
-      row.className = 'record-row' + (state.selectedRecord === rec.id ? ' selected' : '');
-      row.innerHTML = `
-        <div class="record-thumb">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1"><rect x="1" y="1" width="10" height="10" rx="1"/><path d="M1 8l3-3 2 2 2-2.5 3 3.5"/></svg>
-        </div>
-        <div class="record-meta">
-          <span class="record-id" title="${esc(rec.id)}">${esc(shortId(rec.id))}</span>
-          <span class="record-title">${esc(rec.title)}</span>
-          <div class="record-pills">${types.map(t => `<span class="pill ${t}">${typeName(t)}</span>`).join('')}</div>
-        </div>
-      `;
-      row.addEventListener('click', () => openRecord(rec));
-      recordList.appendChild(row);
-    }
   }
 
   // ── Field cards ───────────────────────────────────────────────────────────
@@ -1403,13 +1251,11 @@ let RECORDS = [];
   // Whole record; while a chart selection is active a button leads back to it
   function openRecord(rec) {
     state.selectedRecord = rec.id;
-    renderRecordList();
     renderFieldCards(rec);
   }
 
   $('detail-back').addEventListener('click', () => {
     if (!state.segment) return;
-    renderRecordList();
     renderAttributeView();
   });
 
@@ -1597,7 +1443,6 @@ let RECORDS = [];
     state.segment = null;
     renderFilterSummary();
     renderBarChart();
-    renderRecordList();
     const rec = RECORDS.find(r => r.id === state.selectedRecord);
     if (rec) renderFieldCards(rec);
     else if (hadSegment) showEmptyDetail();
@@ -1650,7 +1495,6 @@ let RECORDS = [];
     if (!rec) return;
     modalOverlay.hidden = true;
     state.selectedRecord = rec.id;
-    renderRecordList();
     renderFieldCards(rec);
   });
 
