@@ -45,7 +45,7 @@ Every record is flagged by the taxonomy engine (`js/analysis.js`, rules from
   deficiency; the underline styles give a second cue.
 - **Absent**: the field is empty, or holds only a placeholder such as "none" or "unknown".
 - **Uncertainty types**: incomplete, inconsistent and contested flags from the taxonomy rules. A
-  field can carry more than one. Hover over a tag to see the rule codes and reasons.
+  field can carry more than one. Hover over a highlighted word or a type pill, or press (i) on a card, for a plain-language explanation; taxonomy codes are kept in the data but not shown.
 - **Term clusters**: collection-wide variant groups (Gypsy / Gipsy / Romani / Roma, United
   Kingdom / Great Britain / UK, …). The pop-up lists the variants with their counts (★ marks the
   reference term) and the records that use them; click a record to open it.

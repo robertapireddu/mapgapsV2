@@ -42,19 +42,21 @@
   ];
 
   const FIELDS = [
-    { key: 'dcTitle', label: 'DC Title' },
-    { key: 'dcDate', label: 'DC Date' },
-    { key: 'dctermsCreated', label: 'DCTerms Created' },
-    { key: 'dcCreator', label: 'DC Creator' },
-    { key: 'dcContributor', label: 'DC Contributor' },
-    { key: 'dcCoverage', label: 'DC Coverage' },
-    { key: 'dctermsProvenance', label: 'DCTerms Provenance' },
-    { key: 'edmCountry', label: 'EDM Country' },
-    { key: 'dcSubject', label: 'DC Subject' },
-    { key: 'dcType', label: 'DC Type' },
-    { key: 'dcDescription', label: 'DC Description' },
+    { key: 'dcTitle', label: 'DC Title', plain: 'Title' },
+    { key: 'dcDate', label: 'DC Date', plain: 'Date' },
+    { key: 'dctermsCreated', label: 'DCTerms Created', plain: 'Date created' },
+    { key: 'dcCreator', label: 'DC Creator', plain: 'Creator' },
+    { key: 'dcContributor', label: 'DC Contributor', plain: 'Contributor' },
+    { key: 'dcCoverage', label: 'DC Coverage', plain: 'Place' },
+    { key: 'dctermsProvenance', label: 'DCTerms Provenance', plain: 'Provenance' },
+    { key: 'edmCountry', label: 'EDM Country', plain: 'Country' },
+    { key: 'dcSubject', label: 'DC Subject', plain: 'Subject' },
+    { key: 'dcType', label: 'DC Type', plain: 'Type' },
+    { key: 'dcDescription', label: 'DC Description', plain: 'Description' },
   ];
   const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((f) => [f.key, f]));
+  // reasons are written for people who do not know the metadata schema: everyday field names
+  const plainName = (key) => FIELD_BY_KEY[key].plain;
 
   // ================================================================ helpers
 
@@ -492,7 +494,7 @@
         for (const field of fieldsOf(rule.id)) {
           if (!liveValues(record, field).length) {
             flag(record, rule.id, field, -1, {
-              reason: record.values[field].length ? `Only a placeholder is recorded ("${record.values[field][0]}")` : 'Empty field',
+              reason: record.values[field].length ? `Only a placeholder ("${record.values[field][0]}") is given instead of real information` : 'This field is empty',
             });
           }
         }
@@ -504,7 +506,7 @@
           const hits = [];
           for (const k of ctx.temporal) for (const h of findAll(k.re, v)) hits.push({ ...h, keyword: k.keyword });
           for (const h of nonOverlapping(hits.filter(notFalsePositive(v)))) {
-            flag(record, 'INT-TEMP-INCOMP', field, i, { start: h.start, end: h.end, term: h.text, reason: `Imprecise date (keyword: ${h.keyword})` });
+            flag(record, 'INT-TEMP-INCOMP', field, i, { start: h.start, end: h.end, term: h.text, reason: `The date is only approximate ("${h.text}"): no exact date is given` });
           }
         }
       }
@@ -514,20 +516,20 @@
         const dateField = field === 'dcDate' || field === 'dctermsCreated';
         for (const { v, i } of liveValues(record, field)) {
           const checks = [
-            [/(?<![\p{N}])1\d{2}[?xXu_-](?![\p{N}])|(?<![\p{N}])1\d[?xXu_]{2}(?![\p{L}\p{N}])/gu, 'Digits of the year left out or guessed'],
-            [/(?<![\p{N}])\d{4}\s*\?|\[\s*\d{4}\s*\??\s*\]/gu, 'Year marked as a cataloguer\'s guess'],
-            [/(?<![\p{L}\p{N}])['’]\d{2}(?![\p{N}s'’])/gu, 'Year abbreviated to two digits'],
+            [/(?<![\p{N}])1\d{2}[?xXu_-](?![\p{N}])|(?<![\p{N}])1\d[?xXu_]{2}(?![\p{L}\p{N}])/gu, 'Part of the year is missing or guessed'],
+            [/(?<![\p{N}])\d{4}\s*\?|\[\s*\d{4}\s*\??\s*\]/gu, 'The year is marked as a guess'],
+            [/(?<![\p{L}\p{N}])['’]\d{2}(?![\p{N}s'’])/gu, 'The year is shortened to two digits'],
           ];
           if (dateField) {
-            checks.push([/\b\d{5,}\b/g, 'Too many digits for a year (typo?)']);
-            checks.push([/\b\d{4}-(1[3-9]|[2-9]\d)\b/g, 'Month out of range (typo?)']);
+            checks.push([/\b\d{5,}\b/g, 'This year has too many digits: probably a typo']);
+            checks.push([/\b\d{4}-(1[3-9]|[2-9]\d)\b/g, 'The month number is not valid: probably a typo']);
             checks.push([/\b\d{4}\b/g, null]);
           }
           const hits = [];
           for (const [re, reason] of checks) {
             for (const h of findAll(re, v)) {
               if (reason) hits.push({ ...h, reason });
-              else if (+h.text > CURRENT_YEAR) hits.push({ ...h, reason: 'Year lies in the future (typo?)' });
+              else if (+h.text > CURRENT_YEAR) hits.push({ ...h, reason: 'This year is in the future: probably a typo' });
             }
           }
           for (const h of nonOverlapping(hits)) flag(record, 'EXT-UI-TEMP-INCOM', field, i, { start: h.start, end: h.end, term: h.text, reason: h.reason });
@@ -543,7 +545,7 @@
         if (distinct.length < 2) continue;
         for (const { i } of temporalValues) {
           flag(record, 'EXT-UI-TEMP-INCONS', field, i, {
-            reason: `${FIELD_BY_KEY[field].label} holds ${distinct.length} different time indications: ${temporalValues.map((x) => `"${x.v}"`).join(', ')}`,
+            reason: `This field gives ${distinct.length} different dates or periods: ${temporalValues.map((x) => `"${x.v}"`).join(', ')}`,
           });
         }
       }
@@ -570,7 +572,7 @@
           if (!conflicts.length || (s.field === 'dcDescription' && descriptionAgrees)) continue;
           const span = s.start != null ? { start: s.start, end: s.end, term: s.text } : {};
           flag(record, 'INT-TEMP-INCONS', s.field, s.i, {
-            ...span, reason: `"${s.text}" contradicts ${conflicts.map((c) => `${FIELD_BY_KEY[c.field].label} "${c.text}"`).join(', ')}`,
+            ...span, reason: `"${s.text}" does not match the date given in ${conflicts.map((c) => `${plainName(c.field)} ("${c.text}")`).join(', ')}`,
           });
         }
       }
@@ -584,7 +586,7 @@
         if (!finer) {
           for (const field of fields.filter((f) => f !== 'dcDescription')) {
             for (const { v, i } of liveValues(record, field)) {
-              if (isCountryOnly(ctx, v)) flag(record, 'INT-SP-INCOMP', field, i, { reason: `Only the country is given ("${v}"); no finer place anywhere in the record` });
+              if (isCountryOnly(ctx, v)) flag(record, 'INT-SP-INCOMP', field, i, { reason: `Only the country is given ("${v}"): no town or region is named anywhere in the record` });
             }
           }
         }
@@ -595,10 +597,10 @@
         for (const { v, i } of liveValues(record, field)) {
           const hits = [];
           const regional = field === 'dcDescription' ? ctx.regionalNoContinents : ctx.regional;
-          for (const h of findAll(regional, v)) hits.push({ ...h, reason: `Over-broad regional label "${h.text}"` });
+          for (const h of findAll(regional, v)) hits.push({ ...h, reason: `"${h.text}" is a very broad region, not a precise place` });
           if (field !== 'dcDescription') {
             for (const h of findAll(/(?<![\p{L}])(near|nr\.|around|probably|possibly|perhaps|somewhere in|region of)(?![\p{L}])|\?/giu, v)) {
-              hits.push({ ...h, reason: 'Place is approximate or guessed' });
+              hits.push({ ...h, reason: 'The place is approximate or a guess' });
             }
           }
           for (const h of nonOverlapping(hits.filter(notFalsePositive(v)))) {
@@ -615,8 +617,8 @@
         }
         const countries = uniq(found.map((f) => f.country));
         if (countries.length > 1) {
-          const summary = countries.map((c) => `${c} (${uniq(found.filter((f) => f.country === c).map((f) => FIELD_BY_KEY[f.field].label)).join(', ')})`).join(' vs ');
-          for (const f of found) flag(record, 'INT-SP-INCONS', f.field, f.i, { start: f.start, end: f.end, term: f.text, reason: `Fields disagree on the country: ${summary}` });
+          const summary = countries.map((c) => `${c} (in ${uniq(found.filter((f) => f.country === c).map((f) => plainName(f.field))).join(', ')})`).join(' and ');
+          for (const f of found) flag(record, 'INT-SP-INCONS', f.field, f.i, { start: f.start, end: f.end, term: f.text, reason: `The record gives different countries: ${summary}` });
         }
       }
 
@@ -637,7 +639,7 @@
           const forms = uniq(xs.map((x) => x.v));
           if (forms.length < 2) continue;
           const groupId = key.startsWith('vocab:') ? key : undefined;
-          for (const x of xs) flag(record, 'EXT-UI-SPA-INCONS', x.field, x.i, { groupId, reason: `The same place is entered in ${forms.length} forms: ${forms.map((f) => `"${f}"`).join(', ')}` });
+          for (const x of xs) flag(record, 'EXT-UI-SPA-INCONS', x.field, x.i, { groupId, reason: `This record names the same place in ${forms.length} ways: ${forms.map((f) => `"${f}"`).join(', ')}` });
         }
         if (fields.includes('dcCoverage')) {
           const places = liveValues(record, 'dcCoverage').filter(({ v }) => !isCountryOnly(ctx, v));
@@ -647,7 +649,7 @@
             return g ? `vocab:${g.id}` : looseKey(v);
           };
           if (uniq(distinct.map(placeKey)).length > 1) {
-            for (const { i } of distinct) flag(record, 'EXT-UI-SPA-INCONS', 'dcCoverage', i, { reason: `Several places are indicated: ${distinct.map((d) => `"${d.v}"`).join(', ')}` });
+            for (const { i } of distinct) flag(record, 'EXT-UI-SPA-INCONS', 'dcCoverage', i, { reason: `Several different places are given: ${distinct.map((d) => `"${d.v}"`).join(', ')}` });
           }
         }
       }
@@ -660,7 +662,7 @@
         const localityOnly = values.filter((x) => x.field !== 'edmCountry' && !isCountryOnly(ctx, x.v) && !x.v.includes(','));
         const hierarchical = values.some((x) => x.v.split(',').filter((p) => p.trim()).length > 1);
         if (countryOnly.length && localityOnly.length && !hierarchical) {
-          const reason = `Place hierarchy split across values: ${localityOnly.map((c) => `"${c.v}"`).join(', ')} without region or country, ${uniq(countryOnly.map((c) => `"${c.v}"`)).join(', ')} without locality`;
+          const reason = `The place is split over separate entries and none gives it in full: ${localityOnly.map((c) => `"${c.v}"`).join(', ')} has no region or country, ${uniq(countryOnly.map((c) => `"${c.v}"`)).join(', ')} has no town`;
           for (const x of [...localityOnly, ...countryOnly]) flag(record, 'EXT-DATAC-SPA-INCONS', x.field, x.i, { reason });
         }
       }
@@ -678,8 +680,8 @@
                 flag(record, 'INT-LING-INCOMP', field, i, {
                   start: h.start, end: h.end, term: h.text, type: contested ? 'contested' : 'incomplete',
                   reason: contested
-                    ? `Generic label "${h.text}" while self-designated terms are known (${g.specific.slice(0, 4).join(', ')}…): treated as Contested. ${g.note || ''}`.trim()
-                    : `Generic or aggregated label "${h.text}": the specific community or practice cannot be recovered from the record`,
+                    ? `"${h.text}" is a general label, while the community's own names are known (${g.specific.slice(0, 4).join(', ')}…). ${g.note || ''}`.trim()
+                    : `"${h.text}" is a general label: the specific community or practice cannot be identified from the record`,
                 });
               }
             }
@@ -693,11 +695,11 @@
           for (const h of findAll(ctx.contested, v).filter(notFalsePositive(v))) {
             const entry = ctx.contestedEntry.get(termKey(h.text));
             const reason = entry
-              ? `"${h.text}" is listed in the DE-BIAS vocabulary (${entry.id})` +
-                (entry.contextDependent ? ', context-dependent: check how it is used here' : '') +
+              ? `"${h.text}" is listed as a contested term in the DE-BIAS vocabulary` +
+                (entry.contextDependent ? '. Whether it is a problem depends on how it is used here' : '') +
                 (entry.suggestion ? `. ${entry.suggestion}` : '') +
                 (entry.alternatives && entry.alternatives.length ? ` Suggested alternatives: ${entry.alternatives.join(', ')}.` : '')
-              : `"${h.text}" is an outdated or biased term introduced by the recorder`;
+              : `"${h.text}" is an outdated or biased term`;
             flag(record, 'EXT-UI-LING-CONT', field, i, {
               start: h.start, end: h.end, term: h.text, reason,
               ...(entry ? { source: entry.id, link: entry.link, contextDependent: entry.contextDependent } : {}),
@@ -710,14 +712,14 @@
       for (const field of fieldsOf('EXT-UI-LING-INCOM')) {
         for (const { v, i } of liveValues(record, field)) {
           let reason = null;
-          if (/(\.\.\.|…)$/.test(v)) reason = 'Entry is cut off ("…")';
-          else if (/[-–/(,&]$/.test(v)) reason = 'Entry ends mid-phrase';
-          else if ((v.match(/\(/g) || []).length > (v.match(/\)/g) || []).length || (v.match(/"/g) || []).length % 2) reason = 'Unclosed bracket or quote: the entry looks truncated';
-          else if (v.replace(/[^\p{L}]/gu, '').length <= 2 && !isCountryOnly(ctx, v)) reason = 'Entry is only one or two letters';
-          else if (v.length === 255 || v.length === 256) reason = 'Entry stops exactly at a field-length limit';
-          else if (/^\p{L}{1,5}\.$/u.test(v)) reason = 'Entry is an abbreviation';
+          if (/(\.\.\.|…)$/.test(v)) reason = 'The text is cut off ("…")';
+          else if (/[-–/(,&]$/.test(v)) reason = 'The text stops in the middle of a phrase';
+          else if ((v.match(/\(/g) || []).length > (v.match(/\)/g) || []).length || (v.match(/"/g) || []).length % 2) reason = 'A bracket or quote is never closed, so the text looks cut off';
+          else if (v.replace(/[^\p{L}]/gu, '').length <= 2 && !isCountryOnly(ctx, v)) reason = 'The entry is only one or two letters';
+          else if (v.length === 255 || v.length === 256) reason = 'The text stops exactly at the maximum length, so it was probably cut off';
+          else if (/^\p{L}{1,5}\.$/u.test(v)) reason = 'The entry is an abbreviation';
           const vague = !reason && (field === 'dcTitle' || field === 'dcDescription') && vagueReason(record, field, v);
-          if (vague) flag(record, 'EXT-UI-LING-INCOM', field, i, { reason: `Vague / non-descriptive: ${vague}`, vague: true });
+          if (vague) flag(record, 'EXT-UI-LING-INCOM', field, i, { reason: `Too vague to describe the object: ${vague}`, vague: true });
           else if (reason) flag(record, 'EXT-UI-LING-INCOM', field, i, { reason });
         }
       }
@@ -726,7 +728,7 @@
       for (const field of fieldsOf('EXT-UI-ATTR-INC')) {
         for (const { v, i } of liveValues(record, field)) {
           if (/^(https?:\/\/)?(www\.|m\.)?wikidata\.org\/?(wiki\/?|entity\/?)?$/i.test(v)) {
-            flag(record, 'EXT-UI-ATTR-INC', field, i, { reason: 'Wikidata address without an item (/wiki/Q…)' });
+            flag(record, 'EXT-UI-ATTR-INC', field, i, { reason: 'The Wikidata link does not point to a specific item' });
           }
         }
       }
@@ -737,7 +739,7 @@
         if (!live.length || live.some(({ v }) => !isUrl(v))) continue;
         for (const { v, i } of live) {
           if (/wikidata\.org\/?(wiki\/?|entity\/?)?$/i.test(v)) continue;
-          flag(record, 'EXT-DATAC-LINK-INCOMP', field, i, { reason: 'Only a URL is recorded; no descriptive value (name) survives' });
+          flag(record, 'EXT-DATAC-LINK-INCOMP', field, i, { reason: 'Only a web link is given, without a name' });
         }
       }
 
@@ -751,7 +753,7 @@
             const flattened = target.filter((t) => /^\d{4}$/.test(t) && v.includes(t.slice(0, 3)));
             if ((range || QUALIFIER_RE.test(v)) && flattened.length) {
               flag(record, 'EXT-DATAC-TEMP-INCOM', field, i, {
-                reason: `${range ? 'Single year where range expected' : 'Qualifier stripped'}: source "${v}" → Europeana proxy "${flattened[0]}"`,
+                reason: `${range ? 'The date range was reduced to one year' : 'A qualifier such as "circa" was dropped'}: the provider gave "${v}", Europeana shows "${flattened[0]}"`,
               });
             }
           }
@@ -761,7 +763,7 @@
             if (!/^\d{4}$/.test(v)) continue;
             const richer = others.find((o) => new RegExp(`\\d{4}\\s*[-–]\\s*${v}|${v}\\s*[-–]\\s*\\d{4}`).test(o) ||
               new RegExp(`(c\\.|ca\\.?|circa|approx\\.?|~)\\s*${v}|${v}\\s*(\\?|,?\\s*uncertain)`, 'i').test(o));
-            if (richer) flag(record, 'EXT-DATAC-TEMP-INCOM', field, i, { reason: `"${v}" is flatter than elsewhere in the record ("${clip(richer)}"): range or qualifier lost` });
+            if (richer) flag(record, 'EXT-DATAC-TEMP-INCOM', field, i, { reason: `"${v}" is less precise than another date in this record ("${clip(richer)}"): a range or qualifier was lost` });
           }
         }
       }
@@ -772,7 +774,7 @@
           const target = (record.target[field] || []).filter((v) => !isPlaceholder(v));
           if (!target.length || !target.every((t) => isCountryOnly(ctx, t))) continue;
           for (const { v, i } of liveValues(record, field)) {
-            if (!isCountryOnly(ctx, v)) flag(record, 'EXT-DATAC-SPA-INCOM', field, i, { reason: `Source "${v}" reduced to "${target.join(', ')}" in the Europeana proxy` });
+            if (!isCountryOnly(ctx, v)) flag(record, 'EXT-DATAC-SPA-INCOM', field, i, { reason: `The provider gave "${v}", but Europeana shows only "${target.join(', ')}"` });
           }
         }
       }
@@ -784,7 +786,7 @@
           const target = (record.target[field] || []).filter((v) => !isPlaceholder(v));
           if (target.length && source.length > target.length) {
             flag(record, 'EXT-DATAC-LING-INCOM', field, -1, {
-              reason: `${source.length} source values collapsed to ${target.length} in the Europeana proxy (${target.map((t) => `"${t}"`).join(', ')})`,
+              reason: `The provider gave ${source.length} values here, but Europeana kept only ${target.length} (${target.map((t) => `"${t}"`).join(', ')})`,
             });
           }
         }
@@ -825,7 +827,7 @@
         for (const o of occs) {
           flag(record, 'EXT-UI-LING-INCONS', o.field, o.valueIndex, {
             start: o.start, end: o.end, term: o.text, groupId: `vocab:${gid}`, variant: o.canonical.toLowerCase(),
-            reason: `This record names the same community or entity in ${forms.length} ways: ${forms.join(', ')}`,
+            reason: `This record names the same community or thing in ${forms.length} ways: ${forms.join(', ')}`,
           });
         }
       }
@@ -853,7 +855,7 @@
           kind: accentsOnly ? 'accents' : 'spelling', rule: accentsOnly ? 'EXT-DATAC-LING-INCONS' : 'INT-LING-INCONS',
           label: `${FIELD_BY_KEY[field].label} "${forms[0]}"`,
           note: accentsOnly
-            ? 'The same term with and without diacritics: converted differently across records.'
+            ? 'The same term appears with and without accents in different records.'
             : 'The same term written in different ways across the collection.',
         });
         for (const o of occs) b.add(o.text, o);
@@ -879,7 +881,7 @@
         const b = builder(`accents:text:${key}`, {
           kind: 'accents', rule: 'EXT-DATAC-LING-INCONS',
           label: `"${occs.find((o) => o.text.toLowerCase() !== fold(o.text)).text}" with and without diacritics`,
-          note: 'The same word with and without diacritics: converted differently across records.',
+          note: 'The same word appears with and without accents in different records.',
         });
         for (const o of occs) b.add(o.text, o, o.text.toLowerCase());
       }
@@ -892,7 +894,7 @@
       for (const field of fieldsOf('EXT-DATAC-TEMP-INCONS')) {
         for (const { v, i } of liveValues(record, field)) {
           for (const h of findAll(APPROX_NOTATION_RE, v)) {
-            builder('format:approx', { kind: 'format', rule: 'EXT-DATAC-TEMP-INCONS', label: 'Notation for approximate dates', note: 'The same approximation ("circa 1880") appears in different notations across records.' })
+            builder('format:approx', { kind: 'format', rule: 'EXT-DATAC-TEMP-INCONS', label: 'Notation for approximate dates', note: 'Approximate dates are written in different ways across records ("circa 1880", "ca. 1880").' })
               .add(fold(h.text).trim(), { recordId: record.id, field, valueIndex: i, start: h.start, end: h.start + h.text.trimEnd().length, text: h.text.trim() });
           }
         }
@@ -983,7 +985,7 @@
           const carried = withTarget.some((r) => (r.target[field] || []).length);
           if (carried || present.length / withTarget.length < 0.2) continue;
           for (const r of present) {
-            flag(r, ruleId, field, -1, { reason: `Given as text in ${present.length} of ${withTarget.length} records at the provider proxy, but never linked or carried to the Europeana proxy` });
+            flag(r, ruleId, field, -1, { reason: `The provider gives this in ${present.length} of ${withTarget.length} records, but Europeana never carries it over` });
           }
         }
       }
@@ -1003,14 +1005,14 @@
       const ruleId = group.kind === 'vocabulary' ? (group.spatial ? null : 'INT-LING-INCONS') : group.rule;
       if (!ruleId) continue;
       const preferred = group.variants.find((v) => v.preferred);
-      const forms = group.variants.map((v) => `"${v.label}" (${v.count})`).join(', ');
+      const forms = group.variants.map((v) => `"${v.label}" (${v.count} ${v.count === 1 ? 'time' : 'times'})`).join(', ');
       for (const variant of group.variants.filter((v) => !v.preferred)) {
         for (const o of variant.occurrences) {
           flag(byId.get(o.recordId), ruleId, o.field, o.valueIndex, {
             start: o.start, end: o.end, term: o.text, groupId: id, variant: variant.key,
             reason: preferred
-              ? `"${o.text}" is used where the reference form is "${preferred.label}" (${group.variants.length} forms in use)`
-              : `The collection uses ${group.variants.length} forms for the same term: ${forms}`,
+              ? `"${o.text}" is used where the standard form is "${preferred.label}"`
+              : `Across the collection the same term is written in ${group.variants.length} ways: ${forms}`,
           });
         }
       }

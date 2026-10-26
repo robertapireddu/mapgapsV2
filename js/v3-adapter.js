@@ -25,6 +25,9 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fold = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
+  /** Hover text of a flagged word: one "type<TAB>plain reason" line per flag. */
+  const tip = (flags) => [...new Set(flags.map((f) => `${f.type}\t${f.reason}`))].join('\n');
+
   /** One value as HTML: flagged words wrapped in spans, linked entities as links. */
   function valueHtml(record, field, value, valueIndex, A) {
     const flags = record.flags.filter((f) => f.field === field && f.valueIndex === valueIndex && UNCERTAIN.includes(f.type));
@@ -40,14 +43,13 @@
     for (const s of spans) {
       if (s.start < cursor) continue;
       const same = spans.filter((o) => o.start === s.start && o.end === s.end);
-      const notes = same.map((o) => `${o.code}: ${o.reason}`);
       html += esc(value.slice(cursor, s.start));
-      html += `<span class="${wordClass(same.map((o) => o.type))}" title="${esc(notes.join('\n'))}">${esc(value.slice(s.start, s.end))}</span>`;
+      html += `<span class="${wordClass(same.map((o) => o.type))}" data-tip="${esc(tip(same))}">${esc(value.slice(s.start, s.end))}</span>`;
       cursor = s.end;
     }
     html += esc(value.slice(cursor));
     if (wholeFlags.length) {
-      html = `<span class="${wordClass(wholeFlags.map((f) => f.type))}" title="${esc(wholeFlags.map((f) => `${f.code}: ${f.reason}`).join('\n'))}">${html}</span>`;
+      html = `<span class="${wordClass(wholeFlags.map((f) => f.type))}" data-tip="${esc(tip(wholeFlags))}">${html}</span>`;
     }
     const link = (record.links && record.links[field] || []).find((l) => l.label === value);
     if (link) html = `<a class="entity-link" href="${esc(link.uri)}" target="_blank" rel="noopener" title="${esc(link.uri)}">${html}</a>`;
@@ -89,10 +91,10 @@
       for (const key of ATTRS) {
         const live = r.values[key].map((v, i) => ({ v, i })).filter(({ v }) => !A.isPlaceholder(v));
         const all = r.flags.filter((f) => f.field === key);
-        const info = all.filter((f) => f.type === 'missing' && f.origin !== 'Empty field').map((f) => `${f.code}: ${f.reason}`);
-        if (r.derived && r.derived[key]) info.push('dctermsCreated is empty: value taken from Europeana\'s normalised year');
+        const info = all.filter((f) => f.type === 'missing' && f.origin !== 'Empty field').map((f) => f.reason);
+        if (r.derived && r.derived[key]) info.push('The creation date is empty here: the year shown comes from Europeana');
         if (!live.length) {
-          const reason = r.values[key].length ? `Only a placeholder is recorded ("${r.values[key][0]}")` : 'Empty field';
+          const reason = r.values[key].length ? `Only a placeholder ("${r.values[key][0]}") is given instead of real information` : 'This field is empty';
           // dimensions of the taxonomy's missing-field rules that flag this field (MISS-TEMP, MISS-SP, ...)
           const dims = [...new Set(all.filter((f) => f.type === 'missing' && f.origin === 'Empty field').map((f) => DIM[f.dimension]).filter(Boolean))];
           if (!dims.length) dims.push(ATTR_DIM[key]);
@@ -102,7 +104,8 @@
         const seen = new Set();
         const flags = [];
         for (const f of all.filter((x) => UNCERTAIN.includes(x.type))) {
-          const note = `${f.code}: ${f.reason}`;
+          // plain-language reason only: the taxonomy code stays in `code`
+          const note = f.reason;
           if (seen.has(f.type + note)) continue;
           seen.add(f.type + note);
           flags.push({ type: f.type, dim: DIM[f.dimension] || ATTR_DIM[key], code: f.code, note, contextDependent: Boolean(f.contextDependent) });

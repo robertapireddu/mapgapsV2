@@ -470,10 +470,10 @@ input  { font-family: inherit; }
   color: var(--fg-2); cursor: help; white-space: nowrap;
 }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--border-mid); }
-.status-pill.incomplete   .status-dot { background: var(--c-incomplete-bar); }
-.status-pill.inconsistent .status-dot { background: var(--c-inconsistent-bar); }
-.status-pill.contested    .status-dot { background: var(--c-contested-bar); }
-.status-pill.missing      .status-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--blue-solid); }
+.status-pill.incomplete .status-dot, .tip-type.incomplete .status-dot { background: var(--c-incomplete-bar); }
+.status-pill.inconsistent .status-dot, .tip-type.inconsistent .status-dot { background: var(--c-inconsistent-bar); }
+.status-pill.contested .status-dot, .tip-type.contested .status-dot { background: var(--c-contested-bar); }
+.status-pill.missing .status-dot, .tip-type.missing .status-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--blue-solid); }
 .status-pill.ok { cursor: default; color: var(--fg-3); }
 .card-info-btn {
   width: 22px; height: 22px; border-radius: 50%; border: none; flex-shrink: 0; cursor: pointer;
@@ -515,6 +515,19 @@ input  { font-family: inherit; }
 .also-contested    { box-shadow: 0 0 0 1.5px var(--c-contested-bar); }
 .also-inconsistent { box-shadow: 0 0 0 1.5px var(--c-inconsistent-bar); }
 .also-incomplete   { box-shadow: 0 0 0 1.5px var(--c-incomplete-bar); }
+/* hover box for flagged words and status pills: the type(s) and why, in plain words */
+#word-tip {
+  position: fixed; z-index: 1000; max-width: 340px; pointer-events: none;
+  background: var(--bg-panel); border: 1px solid var(--border-mid); border-radius: var(--r);
+  padding: 10px 12px; box-shadow: 0 8px 22px rgba(20, 30, 50, 0.18);
+  font-size: 12px; line-height: 1.45; color: var(--fg); text-transform: none; letter-spacing: 0;
+}
+.tip-type {
+  display: flex; align-items: center; gap: 6px; color: var(--fg-2);
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+}
+#word-tip ul { margin: 4px 0 8px; padding-left: 16px; }
+#word-tip ul:last-child { margin-bottom: 0; }
 #word-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 6px 0 2px; font-size: 10px; color: var(--fg-3); }
 #word-legend span[class$="-word"] { font-size: 10.5px; }
 /* Loaded-data additions */
@@ -1457,7 +1470,7 @@ let RECORDS = [];
       t.context = t.context && Boolean(f.contextDependent); // DE-BIAS "disambiguation needed"
     }
     const pills = [...byType].map(([t, x]) =>
-      `<span class="status-pill ${t}" title="${esc((x.context ? ['Check the context: DE-BIAS marks this term as context-dependent'] : []).concat(x.notes).join('\n'))}"><span class="status-dot"></span>${typeName(t)}${x.context ? ' <span class="ctx-mark" aria-label="check context">⚠</span>' : ''}</span>`).join('')
+      `<span class="status-pill ${t}" data-tip="${esc(x.notes.map(n => `${t}\t${n}`).join('\n'))}"><span class="status-dot"></span>${typeName(t)}${x.context ? ' <span class="ctx-mark" aria-label="check context">⚠</span>' : ''}</span>`).join('')
       || (!(field.flags || []).length ? '<span class="status-pill ok"><span class="status-dot"></span>no issue</span>' : '');
 
     // the flagged words, taken from the highlighted spans of the value
@@ -1467,7 +1480,7 @@ let RECORDS = [];
       tmp.innerHTML = field.value || '';
       tmp.querySelectorAll('[class*="-word"]').forEach(el => {
         const text = el.textContent.trim();
-        if (text && !words.has(text.toLowerCase())) words.set(text.toLowerCase(), `<span class="${esc(el.className)}">${esc(text)}</span>`);
+        if (text && !words.has(text.toLowerCase())) words.set(text.toLowerCase(), `<span class="${esc(el.className)}" data-tip="${esc(el.dataset.tip || '')}">${esc(text)}</span>`);
       });
     }
     const shownWords = [...words.values()];
@@ -1507,6 +1520,36 @@ let RECORDS = [];
     card.innerHTML = `<div class="card-name">${ATTR_LABELS[key]}</div><div class="card-key">${key}</div>`;
     return card;
   }
+
+  // Hover box for flagged words and status pills (data-tip: one "type<TAB>reason" line per flag)
+  const tipBox = document.createElement('div');
+  tipBox.id = 'word-tip';
+  tipBox.hidden = true;
+  tipBox.setAttribute('role', 'tooltip');
+  document.body.appendChild(tipBox);
+  function showTip(el) {
+    const byType = new Map();
+    for (const line of el.dataset.tip.split('\n')) {
+      const [t, reason] = line.split('\t');
+      if (!byType.has(t)) byType.set(t, []);
+      if (reason) byType.get(t).push(reason);
+    }
+    tipBox.innerHTML = [...byType].map(([t, reasons]) =>
+      `<div class="tip-type ${t}"><span class="status-dot"></span>${typeName(t)}</div>` +
+      (reasons.length ? `<ul>${reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : '')).join('');
+    tipBox.hidden = false;
+    const r = el.getBoundingClientRect();
+    const left = Math.min(Math.max(8, r.left), innerWidth - tipBox.offsetWidth - 8);
+    let top = r.bottom + 6;
+    if (top + tipBox.offsetHeight > innerHeight - 8) top = r.top - tipBox.offsetHeight - 6;
+    tipBox.style.left = `${left}px`;
+    tipBox.style.top = `${Math.max(8, top)}px`;
+  }
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest && e.target.closest('[data-tip]');
+    if (el && el.dataset.tip) showTip(el); else tipBox.hidden = true;
+  });
+  document.addEventListener('scroll', () => { tipBox.hidden = true; }, true);
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   function openModal(clusterId) {

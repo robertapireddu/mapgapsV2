@@ -61,10 +61,11 @@ test('contested words come only from the DE-BIAS vocabulary', () => {
   const f = out.records[0].fields;
   const gypsy = f.dcTitle.flags.find((x) => x.type === 'contested');
   assert.ok(gypsy, 'Gypsy is contested');
-  assert.match(gypsy.note, /DE-BIAS vocabulary \(debias:t_99_en\)/);
+  assert.match(gypsy.note, /"Gypsy" is listed as a contested term in the DE-BIAS vocabulary/);
+  assert.doesNotMatch(gypsy.note, /EXT|debias:/, 'no taxonomy codes or ids in the explanation');
   assert.match(gypsy.note, /Roma, Sinti/);
   const desc = f.dcDescription.flags.filter((x) => x.type === 'contested').map((x) => x.note).join('\n');
-  assert.match(desc, /"exotic".*context-dependent/);
+  assert.match(desc, /"exotic".*depends on how it is used here/);
   // labels are matched exactly as written (apart from capitals): no plural forms are added
   assert.doesNotMatch(desc, /"natives"/);
   // only entries active in the DE-BIAS Knowledge Graph are used
@@ -100,7 +101,7 @@ test('the bundled collection sample loads without an API key', () => {
   assert.equal(provider, 'TopFoto');
   assert.equal(records.filter((r) => !r.fields.dcTitle.missing).length, 100, 'every record has a title');
   assert.ok(clusters['vocab:roma-gypsy-grt'].terms.length >= 4);
-  assert.ok(!records.some((r) => r.fields.dcType.flags.some((f) => /Vague/.test(f.note))), 'dcType is not checked for vague text');
+  assert.ok(!records.some((r) => r.fields.dcType.flags.some((f) => /vague/i.test(f.note))), 'dcType is not checked for vague text');
 });
 
 test('dates of different records written in different formats are not inconsistent', () => {
@@ -122,7 +123,7 @@ test('subject terms differing only in capital letters are not inconsistent', () 
   ]);
   const incons = (r) => r.fields.dcSubject.flags.filter((f) => f.type === 'inconsistent');
   assert.equal(incons(records[0]).length, 1, 'still flagged: "homes" is a different form');
-  assert.match(incons(records[0])[0].note, /2 forms/);
+  assert.match(incons(records[0])[0].note, /2 ways/);
   const only = run([{ id: '1', dcSubject: 'Housing and Home' }, { id: '2', dcSubject: 'housing and home' }]).records;
   assert.ok(only.every((r) => !incons(r).length));
 });
